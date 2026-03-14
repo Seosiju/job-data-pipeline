@@ -374,13 +374,18 @@ JD company page URL not found: <job_detail_url>
 
 현재 `parser.py`의 `_extract_detail_url()`은 목록 카드에서 JD URL만 저장한다. 이건 문제 없다.
 
-문제는 Phase 2에서 JD URL을 바로 회사 정보 페이지처럼 다루는 오케스트레이션이다.
+문제였던 부분은 Phase 2에서 JD URL을 바로 회사 정보 페이지처럼 다루던 오케스트레이션이었고, 이 메인 경로는 현재 구현에서 수정되었다.
 
-이 문서 기준으로 필요한 변경은 다음과 같다.
+현재 코드 기준으로 반영된 사항:
 
-- JD -> 회사 페이지 URL 추출 함수 추가
-- Phase 2는 JD를 먼저 열고 회사 페이지 URL을 얻은 뒤 회사 페이지를 방문
-- JD 내부 `CorpInformationBox` 값은 회사 페이지 실패 시 fallback 보강 데이터로만 사용
+- JD -> 회사 페이지 URL 추출 함수가 추가되었다.
+- Phase 2는 JD를 먼저 열고 회사 페이지 URL을 얻은 뒤 회사 페이지를 방문한다.
+- `parse_company_detail()`는 JD HTML과 회사 페이지 HTML을 구분한다.
+
+현재 기준의 남은 권장 보강:
+
+- JD 내부 `CorpInformationBox` 값을 회사 페이지 실패 시 fallback 보강 데이터로 쓸지 결정
+- 회사 페이지 URL을 DB에 저장해 매 실행마다 JD를 다시 열지 않도록 할지 결정
 
 ## 10. 테스트 포인트
 

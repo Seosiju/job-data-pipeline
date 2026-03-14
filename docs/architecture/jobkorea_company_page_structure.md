@@ -381,18 +381,21 @@ Company profile table not found: <company_page_url>
 
 현재 `parse_company_detail()`은 `dl`, `table`, 키워드 폴백 순서로 동작한다.
 
-이 회사 페이지 샘플 기준으로는 `table` 전략이 가장 강력하다. 다만 현재 `parser.py`의 `_parse_from_table_structure()`는 각 row에서 첫 번째 `th/td` pair만 읽기 때문에, 한 row 안의 두 번째 필드 쌍을 놓칠 수 있다.
+이 회사 페이지 샘플 기준으로는 `table` 전략이 가장 강력하고, 현재 코드는 `company page structure -> dl -> table -> keyword` 순서로 보강되어 있다.
 
-또한 현재 레이블 매핑은 `기업형태`, `기업규모`만 `company_size`로 처리하고 있어, 샘플에서 실제로 쓰인 `기업구분`을 직접 처리하지 못한다.
+현재 코드는 row 내부의 다중 `th/td` pair를 순회하고, `기업구분`, `기업형태`, `기업규모`를 모두 `company_size`로 매핑한다.
 
-이 문서 기준 권장 변경:
+현재 코드 기준으로 반영된 사항:
 
-- 함수명 명확화: `parse_company_profile()`
-- 테이블 레이블 매핑 helper 분리
-- row 내부의 다중 `th/td` pair 전부를 순회하도록 수정
-- `기업구분`, `기업형태`, `기업규모`를 같은 분류군으로 취급
-- `기업구분 -> company_size` 매핑 규칙을 코드 주석으로 명시
-- `설립일` 원문과 정규화 책임을 parser/validator 중 어디에 둘지 명확히 고정
+- 테이블 레이블 매핑 helper가 분리되어 있다.
+- row 내부의 다중 `th/td` pair를 전부 순회한다.
+- `기업구분`, `기업형태`, `기업규모`를 같은 분류군으로 취급한다.
+- `설립일`은 parser에서 연도 추출, validator에서 범위 검증을 수행한다.
+
+현재 기준의 남은 권장 보강:
+
+- 함수명 명확화가 필요한지 재검토
+- parser와 validator 사이의 책임 분리를 문서에서 더 명시적으로 설명
 
 ## 13. 테스트 포인트
 

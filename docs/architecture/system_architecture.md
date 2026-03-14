@@ -7,10 +7,10 @@
 
 - 현재 구조의 상세 source of truth는 `architecture/`
 - 현재 상태와 handoff는 `status/`
-- 향후 작업 계획은 `plans/`
+- 현재 active 계획은 `plans/`
 - 실행/운영 절차는 `guides/`
-- 구조 변경 기록은 `refactoring/`
-- 완료 보고는 `reports/`
+- 최근 완료 보고는 `reports/`
+- 과거 기록은 `archive/`
 
 세부 저장 규칙은 `docs/README.md`를 기준으로 봅니다.
 

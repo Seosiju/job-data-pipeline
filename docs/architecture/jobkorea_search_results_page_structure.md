@@ -435,17 +435,23 @@ def parse_search_pagination(html: str) -> dict[str, str | list[str]]
 
 ## 9. 현재 코드에 대한 직접 시사점
 
-현재 `parse_job_cards()`는 `soup.find_all("div", attrs={"data-sentry-component": "CardJob"})`를 전역에서 찾는다.
+현재 `parse_job_cards()`는 먼저 `JobList` 컨테이너를 찾고, 그 안에서 `CardJob`를 순회한다.
 
-이 방식은 현재 샘플 기준으로 메인 목록 `20`개가 아니라 전체 `27`개를 잡아 오므로 과수집 위험이 있다.
+즉, 이 문서가 지적한 핵심 문제였던 "전역 `CardJob` 27개 과수집"은 현재 코드에서 1차 보정된 상태다.
 
-이 문서 기준 권장 변경:
+다만 `JobList`를 찾지 못하면 전역 `CardJob`로 폴백하므로, live 구조가 크게 바뀌면 다시 과수집 가능성은 남아 있다.
 
-- `parse_job_cards()`는 먼저 `JobList` 컨테이너를 찾고, 그 안에서만 `CardJob`를 순회
-- `_extract_title()`와 `_extract_company()`는 typography 크기만 보지 말고 `GI_Read` anchor 내부에서 찾도록 스코프 강화
-- `_extract_apply_type()`는 해시 클래스 대신 버튼 텍스트 기반으로 변경
-- `_extract_location()`, `_extract_industry()`, `_extract_job_category()`, `_extract_salary()`는 현재처럼 아이콘 기반 `GrayChip` 식별을 유지하되, 카드 스코프를 더 엄격히 제한
-- 페이지네이션 파서를 별도 함수로 분리
+현재 코드 기준으로 반영된 사항:
+
+- `parse_job_cards()`는 `JobList` 우선 스코프 사용
+- `_extract_title()`와 `_extract_company()`는 `GI_Read` anchor 내부 selector 사용
+- `_extract_apply_type()`는 해시 클래스 대신 버튼 텍스트 기반으로 동작
+- `_extract_location()`, `_extract_industry()`, `_extract_job_category()`, `_extract_salary()`는 아이콘 기반 `GrayChip` 식별 유지
+
+현재 기준의 남은 권장 보강:
+
+- `JobList` 미탐지 시 전역 `CardJob` 폴백 경로를 어떻게 다룰지 명확히 결정
+- 페이지네이션 파서를 별도 함수로 분리할지 판단
 
 ## 10. 테스트 포인트
 

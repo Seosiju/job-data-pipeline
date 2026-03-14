@@ -27,10 +27,10 @@ This file provides guidance to Claude Code when working with this repository.
 
 - `status/`: 지금 상태, 리스크, 다음 액션
 - `architecture/`: 현재 구조, 설계 원칙, 상세 source of truth
-- `plans/`: 착수 전 또는 진행 중 작업 계획
+- `plans/`: 현재 active 계획
 - `guides/`: 실행법과 운영 절차
-- `refactoring/`: 구조 변경 기록
-- `reports/`: 완료 결과 정리. 현재 상태 판단 기준으로 직접 쓰지 않음
+- `reports/`: 최근 완료 결과 정리. 현재 상태 판단 기준으로 직접 쓰지 않음
+- `archive/`: 과거 계획/결과/리팩토링/legacy guide
 
 판단이 애매하면:
 
@@ -38,7 +38,8 @@ This file provides guidance to Claude Code when working with this repository.
 2. 현재 상태의 압축 요약이면 `status/`
 3. 미래 작업 계획이면 `plans/`
 4. 사용법이면 `guides/`
-5. 완료 결과면 `reports/`
+5. 최근 완료 결과면 `reports/`
+6. 과거 기록이면 `archive/`
 
 ## Commands
 

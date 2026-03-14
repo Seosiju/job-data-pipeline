@@ -19,10 +19,10 @@
 
 - `status/`: 지금 상태와 다음 액션
 - `architecture/`: 현재 구조와 설계 원칙의 상세 source of truth
-- `plans/`: 앞으로 할 일의 계획
+- `plans/`: 현재 active plan
 - `guides/`: 실행/운영 방법
-- `refactoring/`: 구조 변경 기록
-- `reports/`: 완료 결과 정리
+- `reports/`: 최근 완료 결과 정리
+- `archive/`: 과거 계획/결과/리팩토링 기록
 
 이 문서는 `status/` 문서이므로 구조의 상세 설명을 담지 않는다. 상세 규칙과 구조 설명은 `docs/README.md`, `docs/architecture/system_architecture.md`를 따른다.
 
@@ -44,7 +44,7 @@
 - 루트: `main.py`, `config.py`, `crawler.py`, `parser.py`, `validators.py`, `database.py`
 - `scripts/`: 수동 점검, 구조 분석, 스케줄링 실행 스크립트
 - `tests/`: 자동 테스트
-- `docs/`: `status`, `architecture`, `plans`, `guides`, `refactoring`, `reports`
+- `docs/`: `status`, `architecture`, `plans`, `guides`, `reports`, `archive`
 
 ## Latest Verification
 
