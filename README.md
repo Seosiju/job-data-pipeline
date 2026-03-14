@@ -28,6 +28,7 @@ jobkorea/
 ├── scripts/
 │   ├── analyze_detail_page.py
 │   ├── manual_test_crawler.py
+│   ├── phase2_smoke_test.py
 │   └── run_crawler.sh
 ├── tests/
 │   ├── fixtures/
@@ -37,6 +38,7 @@ jobkorea/
 │   ├── test_database.py
 │   ├── test_main.py
 │   ├── test_parser.py
+│   ├── test_phase2_smoke_test.py
 │   └── test_validators.py
 └── docs/
     ├── archive/
@@ -132,6 +134,14 @@ createdb jobkorea
 python main.py
 ```
 
+Phase 2 소규모 live smoke test:
+
+```bash
+python scripts/phase2_smoke_test.py --limit 1
+```
+
+이 스크립트는 상세 정보가 비어 있는 회사 중 일부만 골라 실제 `company_page_url` 재사용/회사 페이지 로딩 경로를 검증합니다.
+
 상세 페이지 구조 수동 분석:
 
 ```bash
@@ -165,7 +175,8 @@ pytest tests/ -q
 현재 기준 결과:
 
 - Phase 1/2 parser+main+script 검증: `31 passed`
-- 전체 테스트: `100 passed`
+- Phase 2 smoke path 검증: `29 passed`
+- 전체 테스트: `104 passed`
 
 실DB 통합 테스트를 별도 인스턴스에 붙이는 예시:
 
@@ -217,8 +228,10 @@ pytest tests/ -q
 주요 문서:
 
 - 현재 구조와 동작: `docs/architecture/system_architecture.md`
+- 데이터 검증 동작 reference: `docs/architecture/data_validation_behavior.md`
 - Phase 2 구현 리뷰: `docs/reports/phase2_company_page_fix_review.md`
 - Phase 2 후속 안정화 보고: `docs/reports/phase2_followup_stabilization_report.md`
+- Phase 2 live smoke validation: `docs/reports/phase2_live_smoke_validation_report.md`
 - 중장기 확장 로드맵: `docs/plans/data_pipeline_service_roadmap.md`
 - 현재 상태 요약: `docs/status/current_status.md`
 - 최근 세션 handoff: `docs/status/session_handoff.md`

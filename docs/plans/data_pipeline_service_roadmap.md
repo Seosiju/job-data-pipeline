@@ -1,7 +1,7 @@
 ---
 type: plan
 status: active
-last_reviewed: 2026-03-14
+last_reviewed: 2026-03-15
 superseded_by:
 related_report:
 source_of_truth: true
@@ -66,9 +66,10 @@ source_of_truth: true
 
 현재 가장 먼저 해결해야 할 사실 기반 이슈:
 
-1. Phase 1 정확성 감사와 Phase 2 메인 회사 페이지 전환은 완료됐지만, 회귀 검증 범위가 아직 fixture 중심으로 좁음
-2. `company_page_url`를 DB에 저장하지 않아 Phase 2가 매 실행마다 JD를 다시 열어야 함
-3. 수동 분석 스크립트가 새 Phase 2 흐름을 완전히 반영하지 못함
+1. Phase 1 정확성 감사, Phase 2 메인 회사 페이지 전환, `company_page_url` 저장/재사용은 완료됐지만 회귀 검증 범위가 아직 fixture 중심으로 좁음
+2. 2026-03-15 live smoke test에서 cached `company_page_url` 경로의 회사 페이지 timeout이 실제로 재현됨
+3. 저장된 `company_page_url`가 stale하거나 실패할 때 JD로 재해결하는 fallback이 아직 없음
+4. 현재 구현은 테스트 기준으로 안정화됐지만, live run 기준 end-to-end 검증은 아직 제한적임
 
 즉, 지금은 자동화와 서비스 확장 전에 **정확성 안정화의 마지막 10~20%를 마무리하는 단계**입니다.
 
@@ -160,15 +161,20 @@ Frontend Dashboard
 
 - Phase 1 검색 결과 파서 정확성 감사 완료
 - Phase 2 `JD 상세 -> 회사 페이지 링크 -> 회사 페이지` 메인 경로 구현 완료
-- 남은 일은 Phase 2 후속 보강과 회귀 범위 확장이다.
+- Phase 2 후속 안정화 완료 (`company_page_url` 저장/재사용, `scripts/analyze_detail_page.py --mode jd|company`)
+- Phase 2 smoke script 추가 (`scripts/phase2_smoke_test.py`)
+- 첫 live smoke test에서 cached URL 회사 페이지 timeout 재현
+- 남은 일은 live failure 진단과 회귀 범위 확장이다.
 
 ### 해야 할 일
 
-- `company_page_url` 저장 구조 도입 여부 결정
-- `scripts/analyze_detail_page.py`를 새 Phase 2 흐름에 맞게 정리
+- `crawl_company_page()` live timeout 원인 진단
+- 실패 시 최종 URL/page source를 남기는 진단 경로 추가
+- 소규모 live run으로 `company_page_url` 백필과 재사용 경로를 실제 사이트 기준으로 재확인
 - JD 상세 / 회사 페이지 fixture 추가 확보
 - selector fallback과 페이지 타입 판별 회귀 범위 확장
-- 소규모 live run으로 Phase 1/2 end-to-end 확인
+- 저장된 `company_page_url` 실패 시 JD 재해결 fallback 도입 여부 결정 및 필요 시 구현
+- live run 결과를 기준으로 자동 실행 전에 남은 안정화 항목 확정
 
 ### 완료 기준
 
@@ -176,6 +182,16 @@ Frontend Dashboard
 - 전역 `CardJob` 과수집 문제가 테스트로 재발하지 않음
 - Phase 2가 JD URL 직접 파싱이 아니라 회사 페이지 기준으로 보강 경로를 가짐
 - Phase 2 후속 보강 항목까지 반영되어 live run에서도 경로가 안정적으로 동작함
+
+### 현재 추천 배치
+
+다음 작업은 새 기능 추가보다 **실사이트 실패 원인 진단**이 우선이다.
+
+1. `scripts/phase2_smoke_test.py --limit 1`로 실패 사례를 재현
+2. 실패 시 최종 URL과 page source를 남길 수 있게 로더를 보강
+3. 실패한 회사 페이지를 수동으로 열어 차단/리다이렉트/레이아웃 변형 여부를 분리
+4. 실패 HTML을 fixture로 저장하고 회귀 테스트로 고정
+5. 그 다음에야 fallback 또는 자동 실행 작업으로 넘어간다
 
 ### Phase 1. 배치 자동화와 운영 안정화
 

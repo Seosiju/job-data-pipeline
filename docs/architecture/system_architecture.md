@@ -28,6 +28,7 @@
 - Phase 2는 `company_page_url` 저장/재사용 경로까지 반영됐지만, 기존 데이터 중 URL이 비어 있는 회사는 첫 보강 시 한 번은 JD를 열어야 합니다.
 - 저장된 `company_page_url`가 실패할 때 JD로 재해결하는 fallback은 아직 없습니다.
 - JD/회사 페이지 selector 검증은 아직 소수 fixture 중심입니다.
+- 2026-03-15 live smoke test 기준, cached `company_page_url`가 있어도 일부 회사 페이지는 실제 로딩 단계에서 timeout이 재현됐습니다.
 
 ## 2. 현재 구현 흐름
 
@@ -241,6 +242,7 @@ CREATE TABLE IF NOT EXISTS job_posting_history (
 ## 8. 보조 스크립트
 
 - `scripts/analyze_detail_page.py`: `--mode jd|company`로 JD 상세 구조와 저장된 회사 페이지 구조를 각각 분석하는 보조 스크립트
+- `scripts/phase2_smoke_test.py`: Phase 2 대상 일부만 선택해 `company_page_url` 재사용과 회사 페이지 로딩을 live 기준으로 검증하는 스크립트
 - `scripts/run_crawler.sh`: cron/systemd 등 스케줄러에서 `main.py` 실행
 - `scripts/manual_test_crawler.py`: 초기에 만든 수동 1페이지 CSV 점검 스크립트
 
@@ -254,14 +256,15 @@ CREATE TABLE IF NOT EXISTS job_posting_history (
 - `tests/test_config.py`
 - `tests/test_parser.py`
 - `tests/test_main.py`
+- `tests/test_phase2_smoke_test.py`
 - `tests/test_validators.py`
 - `tests/test_database.py`
 
 실행 결과 기준:
 
-```text
-100 passed
-```
+- Phase 1/2 parser+main+script 검증: `31 passed`
+- Phase 2 smoke path 검증: `29 passed`
+- 전체 테스트: `104 passed`
 
 ## 10. 현재 구현상 참고사항
 

@@ -479,24 +479,30 @@ class DatabaseManager:
             ).fetchone()
             return result is not None
 
-    def get_companies_without_details(self) -> list:
+    def get_companies_without_details(self, limit: int | None = None) -> list:
         """Phase 2: 상세 정보가 없는 회사 목록을 회사당 1건씩 반환"""
+        query = """
+            SELECT DISTINCT ON (c.id) c.id, c.name, c.company_page_url, jp.detail_url
+            FROM companies c
+            LEFT JOIN job_postings jp
+              ON c.id = jp.company_id
+             AND jp.detail_url IS NOT NULL
+            WHERE c.company_size IS NULL
+              AND (
+                NULLIF(c.company_page_url, '') IS NOT NULL
+                OR jp.detail_url IS NOT NULL
+              )
+            ORDER BY c.id,
+                     COALESCE(jp.last_seen_at, jp.crawled_at) DESC NULLS LAST,
+                     jp.id DESC NULLS LAST
+        """
+        params: dict[str, int] = {}
+        if limit is not None:
+            query += "\nLIMIT :limit"
+            params["limit"] = limit
+
         with self.engine.connect() as conn:
-            result = conn.execute(text("""
-                SELECT DISTINCT ON (c.id) c.id, c.name, c.company_page_url, jp.detail_url
-                FROM companies c
-                LEFT JOIN job_postings jp
-                  ON c.id = jp.company_id
-                 AND jp.detail_url IS NOT NULL
-                WHERE c.company_size IS NULL
-                  AND (
-                    NULLIF(c.company_page_url, '') IS NOT NULL
-                    OR jp.detail_url IS NOT NULL
-                  )
-                ORDER BY c.id,
-                         COALESCE(jp.last_seen_at, jp.crawled_at) DESC NULLS LAST,
-                         jp.id DESC NULLS LAST
-            """))
+            result = conn.execute(text(query), params)
             return [
                 {
                     "id": row[0],

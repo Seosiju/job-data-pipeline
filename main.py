@@ -20,6 +20,7 @@ main.py - 잡코리아 크롤링 실행 진입점
 """
 
 import logging
+from collections import Counter
 from datetime import datetime
 
 from config import Config, setup_logging
@@ -242,35 +243,43 @@ def run_phase1(config: Config, db: DatabaseManager) -> dict:
     return totals
 
 
-def run_phase2(config: Config, db: DatabaseManager) -> int:
-    """
-    Phase 2: 상세 페이지 크롤링 및 회사 정보 업데이트
-
-    Returns:
-        int: 업데이트된 회사 수
-    """
-    _print_section("Phase 2: 상세 크롤링")
-
-    companies = db.get_companies_without_details()
+def run_phase2_for_companies(
+    config: Config,
+    db: DatabaseManager,
+    companies: list[dict],
+) -> list[dict]:
+    """선택된 회사 목록에 대해서만 Phase 2 상세 보강을 수행한다."""
     total = len(companies)
 
     if total == 0:
-        logger.info("모든 회사의 상세 정보가 이미 수집되었습니다")
-        print("\n모든 회사의 상세 정보가 이미 수집되었습니다.")
-        return 0
+        logger.info("선택된 Phase 2 대상이 없습니다")
+        print("\n선택된 Phase 2 대상이 없습니다.")
+        return []
 
     logger.info(f"상세 정보 수집 대상: {total}개 회사")
     print(f"\n상세 정보가 필요한 회사: {total}개")
 
-    updated_count = 0
+    results: list[dict] = []
 
     with JobKoreaCrawler(config) as crawler:
         for i, company in enumerate(companies, 1):
             company_id = company["id"]
             company_name = company["name"]
+            used_cached_company_page_url = bool((company.get("company_page_url") or "").strip())
 
             logger.debug(f"[{i}/{total}] {company_name} 크롤링 중...")
             print(f"\n[{i}/{total}] {company_name}")
+
+            result = {
+                "company_id": company_id,
+                "company_name": company_name,
+                "used_cached_company_page_url": used_cached_company_page_url,
+                "company_page_url": None,
+                "job_detail_url": (company.get("detail_url") or "").strip() or None,
+                "status": "unknown",
+                "updated": False,
+                "details": None,
+            }
 
             try:
                 company_page_url, job_detail_url = _resolve_phase2_company_page_url(
@@ -278,7 +287,12 @@ def run_phase2(config: Config, db: DatabaseManager) -> int:
                     crawler,
                     db,
                 )
+                result["company_page_url"] = company_page_url
+                result["job_detail_url"] = job_detail_url
+
                 if not company_page_url:
+                    result["status"] = "skipped_missing_company_page_url"
+                    results.append(result)
                     continue
 
                 # 회사 페이지 방문
@@ -289,6 +303,8 @@ def run_phase2(config: Config, db: DatabaseManager) -> int:
                 if not company_html:
                     logger.info(f"회사 페이지 로드 실패: {company_name}")
                     print("   회사 페이지 로드 실패")
+                    result["status"] = "company_page_load_failed"
+                    results.append(result)
                     continue
 
                 # 회사 페이지 HTML 파싱
@@ -296,16 +312,21 @@ def run_phase2(config: Config, db: DatabaseManager) -> int:
 
                 # 데이터 검증 및 정제
                 validated_details = validate_company_details(details)
+                result["details"] = validated_details
 
                 # DB 업데이트
                 if any(validated_details.values()):
                     db.update_company_details(company_id, validated_details)
-                    updated_count += 1
                     logger.info(f"회사 정보 업데이트: {company_name} - {validated_details}")
                     print(f"   업데이트: {validated_details}")
+                    result["status"] = "updated"
+                    result["updated"] = True
                 else:
                     logger.info(f"추출된 정보 없음: {company_name}")
                     print("   추출된 정보 없음")
+                    result["status"] = "no_details_extracted"
+
+                results.append(result)
 
                 # 다음 요청 전 딜레이
                 if i < total:
@@ -313,7 +334,42 @@ def run_phase2(config: Config, db: DatabaseManager) -> int:
 
             except Exception as e:
                 logger.error(f"상세 크롤링 실패: {company_name} - {e}")
+                result["status"] = "exception"
+                result["error"] = str(e)
+                results.append(result)
 
+    counts = Counter(result["status"] for result in results)
+    logger.info(
+        "Phase 2 상세 처리 결과 - "
+        + ", ".join(f"{status}: {count}" for status, count in sorted(counts.items()))
+    )
+    return results
+
+
+def run_phase2(
+    config: Config,
+    db: DatabaseManager,
+    companies: list[dict] | None = None,
+) -> int:
+    """
+    Phase 2: 상세 페이지 크롤링 및 회사 정보 업데이트
+
+    Returns:
+        int: 업데이트된 회사 수
+    """
+    _print_section("Phase 2: 상세 크롤링")
+
+    if companies is None:
+        companies = db.get_companies_without_details()
+    total = len(companies)
+
+    if total == 0:
+        logger.info("모든 회사의 상세 정보가 이미 수집되었습니다")
+        print("\n모든 회사의 상세 정보가 이미 수집되었습니다.")
+        return 0
+
+    results = run_phase2_for_companies(config, db, companies)
+    updated_count = sum(1 for result in results if result["updated"])
     logger.info(f"Phase 2 완료: {updated_count}/{total}개 회사 업데이트")
     print(f"\nPhase 2 완료: {updated_count}/{total}개 회사 업데이트")
     return updated_count

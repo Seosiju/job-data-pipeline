@@ -1,4 +1,7 @@
-# 데이터 검증 로직 가이드
+# 데이터 검증 동작 정리
+
+> 이 문서는 `validators.py`의 현재 동작을 설명하는 reference 문서입니다.
+> 실행 절차 runbook이 아니므로 `guides/`가 아니라 `architecture/`에 둡니다.
 
 ## 개요
 

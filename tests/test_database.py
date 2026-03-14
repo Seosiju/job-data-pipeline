@@ -600,6 +600,37 @@ class TestInsertJobPosting:
             }
         ]
 
+    @requires_db
+    def test_get_companies_without_details_respects_limit(self):
+        """Phase 2 대상 조회는 limit를 적용할 수 있어야 한다"""
+        db = get_real_db_manager()
+        db.create_tables()
+
+        company_ids = []
+        with db.connect() as conn:
+            unique_id = uuid.uuid4().hex[:8]
+            for index in range(3):
+                company_name = f"phase2limit_{unique_id}_{index}"
+                detail_url = f"https://example.com/phase2limit/{unique_id}/{index}"
+                company_id = db.get_or_create_company(conn, company_name)
+                company_ids.append(company_id)
+                db.insert_job_posting(
+                    conn,
+                    company_id,
+                    {
+                        "title": f"limit test {index}",
+                        "detail_url": detail_url,
+                    },
+                    keyword="데이터분석가",
+                )
+            conn.commit()
+
+        companies = db.get_companies_without_details(limit=2)
+        matched = [row for row in companies if row["id"] in company_ids]
+
+        assert len(companies) == 2
+        assert len(matched) <= 2
+
 
 class TestSummaryAndRecent:
     """get_summary, get_recent_jobs 테스트"""

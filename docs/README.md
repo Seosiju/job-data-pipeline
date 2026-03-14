@@ -7,12 +7,12 @@
 
 ## 폴더 구조
 
-```
+``` 
 docs/
 ├── README.md              ← 지금 보고 있는 파일
 ├── archive/               과거 계획 / 결과 / 리팩토링 / 레거시 가이드
 ├── status/                현재 상태 / 세션 handoff
-├── architecture/          설계 및 로드맵
+├── architecture/          현재 구조 / selector 근거 / 핵심 모듈 동작
 ├── plans/                 현재 active 계획
 ├── reports/               최근 완료 보고서
 └── guides/                운영 runbook
@@ -28,9 +28,9 @@ docs/
 |------|------|-----------|
 | `archive/` | 이 문서는 지금 판단 기준이 아니라 과거 기록인가? | 완료된 plan/report, refactoring 기록, 더 이상 쓰지 않는 guide |
 | `status/` | 지금 무엇이 구현되었고, 다음 세션은 어디서 시작해야 하나? | 현재 상태, 리스크, handoff 같은 압축 문서 |
-| `architecture/` | 시스템은 지금 어떻게 구성되어 있고 어떤 원칙으로 설계되었나? | 현재 구조, 스키마, 기술 선택, 장기 방향 |
+| `architecture/` | 시스템은 지금 어떻게 구성되어 있고 핵심 모듈은 실제로 어떻게 동작하나? | 현재 구조, 스키마, selector 근거, 핵심 모듈 reference |
 | `plans/` | 지금부터 실제로 추진할 active work는 무엇인가? | 착수 전 기획서, 현재 기준으로 살아 있는 계획 |
-| `guides/` | 이것을 실제로 어떻게 실행하거나 운영하는가? | 실행법, 설정법, 스케줄링, 문제 해결 |
+| `guides/` | 이것을 실제로 어떻게 실행하거나 운영하는가? | 실행법, 설정법, 스케줄링, 운영 절차 |
 | `reports/` | 최근 완료된 작업 중 지금도 참고 가치가 있는 결과는 무엇인가? | 완료 보고서, 검증 결과, retrospective |
 
 추가 규칙:
@@ -57,9 +57,9 @@ docs/
 
 ## 📂 폴더별 안내
 
-### `architecture/` — 설계 및 로드맵
+### `architecture/` — 현재 구조와 근거 문서
 
-시스템의 전체 구조, 기술 스택 선정, 장기 로드맵 등 **프로젝트 방향을 결정하는 문서**.
+시스템의 현재 구조, selector 근거, 핵심 모듈 동작처럼 **현재 구현을 설명하는 source of truth 문서**.
 
 | 문서 | 설명 |
 |------|------|
@@ -67,6 +67,7 @@ docs/
 | [jobkorea_search_results_page_structure.md](architecture/jobkorea_search_results_page_structure.md) | 검색 결과 페이지의 메인 목록/페이지네이션 파싱 구조 문서 |
 | [jobkorea_jd_detail_page_structure.md](architecture/jobkorea_jd_detail_page_structure.md) | JD 상세 페이지에서 회사 페이지 링크와 보조 회사 정보를 추출하기 위한 파싱 구조 문서 |
 | [jobkorea_company_page_structure.md](architecture/jobkorea_company_page_structure.md) | 회사 상세 페이지의 라벨-값 테이블 기반 파싱 구조 문서 |
+| [data_validation_behavior.md](architecture/data_validation_behavior.md) | `validators.py`의 실제 검증/정제 동작을 정리한 reference 문서 |
 
 **새 문서 예시**: `database_schema.md`, `api_design.md`, `tech_stack_decision.md`
 
@@ -99,6 +100,8 @@ docs/
 |------|------|
 | [phase1_correctness_audit_report.md](reports/phase1_correctness_audit_report.md) | Phase 1 검색 결과 파서 정확성 감사 결과와 검증 기록 |
 | [phase2_company_page_fix_review.md](reports/phase2_company_page_fix_review.md) | Phase 2 회사 페이지 전환 구현 리뷰와 검증 기록 |
+| [phase2_followup_stabilization_report.md](reports/phase2_followup_stabilization_report.md) | Phase 2 후속 안정화 결과와 검증 기록 |
+| [phase2_live_smoke_validation_report.md](reports/phase2_live_smoke_validation_report.md) | Phase 2 제한 live run 결과와 회사 페이지 로딩 실패 재현 기록 |
 
 **새 문서 예시**: `phase2_report.md`, `performance_report.md`
 
@@ -111,7 +114,6 @@ docs/
 | 문서 | 설명 |
 |------|------|
 | [scheduling_guide.md](guides/scheduling_guide.md) | 스케줄링(cron/launchd) 설정법 |
-| [validators_guide.md](guides/validators_guide.md) | 데이터 검증 로직 사용법 |
 
 **새 문서 예시**: `troubleshooting.md`, `configuration.md`
 
@@ -148,7 +150,8 @@ docs/
 4. `status/current_status.md`
 5. `status/session_handoff.md`
 6. `reports/phase2_company_page_fix_review.md`
-7. `archive/`는 필요할 때만
+7. `reports/phase2_followup_stabilization_report.md`
+8. `archive/`는 필요할 때만
 
 ---
 

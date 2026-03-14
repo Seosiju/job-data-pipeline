@@ -321,6 +321,48 @@ class TestRunPhase2:
         assert parse_calls["company_page_url"] == 0
         assert db.saved_company_page_urls == []
 
+    def test_run_phase2_uses_explicit_companies_without_db_lookup(self, monkeypatch):
+        """명시된 company list가 있으면 DB 대상 조회 없이 처리해야 한다"""
+
+        class FailIfCalledDB(FakePhase2DB):
+            def get_companies_without_details(self):
+                raise AssertionError("should not query db targets")
+
+        db = FailIfCalledDB([])
+        explicit_companies = [
+            {
+                "id": 21,
+                "name": "직접주입회사",
+                "company_page_url": "https://www.jobkorea.co.kr/Recruit/Co_Read/C/21000000",
+                "detail_url": "https://www.jobkorea.co.kr/Recruit/GI_Read/21000000",
+            }
+        ]
+
+        monkeypatch.setattr(main_module, "JobKoreaCrawler", FakePhase2Crawler)
+        monkeypatch.setattr(
+            main_module,
+            "parse_company_detail",
+            lambda html: {
+                "company_size": "중소기업",
+                "employee_count": "10명",
+                "establishment_year": "2020",
+                "homepage_url": "https://direct.example.com",
+            },
+        )
+        monkeypatch.setattr(main_module, "validate_company_details", lambda details: details)
+
+        updated_count = main_module.run_phase2(object(), db, companies=explicit_companies)
+
+        crawler = FakePhase2Crawler.instances[0]
+        assert updated_count == 1
+        assert crawler.job_detail_calls == []
+        assert crawler.company_page_calls == [
+            (
+                "https://www.jobkorea.co.kr/Recruit/Co_Read/C/21000000",
+                "https://www.jobkorea.co.kr/Recruit/GI_Read/21000000",
+            )
+        ]
+
     def test_skips_when_company_page_url_is_missing(self, monkeypatch):
         """JD에서 회사 페이지 링크를 못 찾으면 회사 페이지 방문 없이 스킵해야 한다"""
         db = FakePhase2DB(
