@@ -7,11 +7,12 @@
 - Phase 1: 목록 페이지에서 공고 카드 수집 후 `companies`, `job_postings` 저장
 - Phase 1 정확성 감사 완료: `JobList -> CardJob` 스코프 기반 파서와 fixture 회귀 테스트 확보
 - Phase 2 메인 경로 구현 완료: `JD 상세 -> 회사 페이지 링크 추출 -> 회사 페이지 방문 -> 회사 정보 업데이트`
-- Phase 2 현재 한계: `company_page_url`를 DB에 저장하지 않아 매 실행마다 JD를 다시 열어 회사 페이지 링크를 재추출합니다.
-- 보조 스크립트 현재 한계: `scripts/analyze_detail_page.py`는 아직 새 Phase 2 흐름을 완전히 반영하지 못했습니다.
+- Phase 2 후속 안정화 반영: `companies.company_page_url` 저장/재사용으로 저장된 회사 URL이 있으면 JD 재방문을 건너뜁니다.
+- 보조 스크립트 정리 완료: `scripts/analyze_detail_page.py`는 `--mode jd|company`로 현재 Phase 2 흐름에 맞게 동작합니다.
 - 다중 키워드 실행 지원
 - 증분 크롤링 지원
 - 공고 lifecycle과 변경 이력 추적 지원
+- 관련 회귀 테스트 보강 완료
 
 ## 디렉터리 구조
 
@@ -30,6 +31,7 @@ jobkorea/
 │   └── run_crawler.sh
 ├── tests/
 │   ├── fixtures/
+│   ├── test_analyze_detail_page.py
 │   ├── conftest.py
 │   ├── test_config.py
 │   ├── test_database.py
@@ -133,10 +135,12 @@ python main.py
 상세 페이지 구조 수동 분석:
 
 ```bash
-python scripts/analyze_detail_page.py
+python scripts/analyze_detail_page.py --mode jd
+python scripts/analyze_detail_page.py --mode company
 ```
 
-현재 이 스크립트는 새 Phase 2 흐름과 완전히 동기화되지 않은 보조 도구입니다.
+`--mode jd`는 JD 상세에서 회사 페이지 URL 추출 경로를 점검하고,
+`--mode company`는 저장된 `company_page_url`를 직접 열어 회사 페이지 구조를 분석합니다.
 
 레거시 1페이지 CSV 점검:
 
@@ -160,8 +164,8 @@ pytest tests/ -q
 
 현재 기준 결과:
 
-- Phase 1/2 parser+main 검증: `25 passed`
-- 전체 테스트: `91 passed`
+- Phase 1/2 parser+main+script 검증: `31 passed`
+- 전체 테스트: `100 passed`
 
 실DB 통합 테스트를 별도 인스턴스에 붙이는 예시:
 
@@ -180,6 +184,7 @@ pytest tests/ -q
 
 - 회사 기본 정보
 - `name` 유니크
+- `company_page_url` 저장
 - 상세 페이지에서 `company_size`, `employee_count`, `establishment_year`, `homepage_url` 보강
 
 ### `job_postings`
@@ -207,11 +212,13 @@ pytest tests/ -q
 4. `docs/status/current_status.md`
 5. `docs/status/session_handoff.md`
 6. `docs/reports/phase2_company_page_fix_review.md`
+7. `docs/reports/phase2_followup_stabilization_report.md`
 
 주요 문서:
 
 - 현재 구조와 동작: `docs/architecture/system_architecture.md`
 - Phase 2 구현 리뷰: `docs/reports/phase2_company_page_fix_review.md`
+- Phase 2 후속 안정화 보고: `docs/reports/phase2_followup_stabilization_report.md`
 - 중장기 확장 로드맵: `docs/plans/data_pipeline_service_roadmap.md`
 - 현재 상태 요약: `docs/status/current_status.md`
 - 최근 세션 handoff: `docs/status/session_handoff.md`

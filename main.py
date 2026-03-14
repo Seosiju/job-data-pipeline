@@ -55,6 +55,46 @@ def _init_phase1_stats() -> dict:
     }
 
 
+def _resolve_phase2_company_page_url(
+    company: dict,
+    crawler: JobKoreaCrawler,
+    db: DatabaseManager,
+) -> tuple[str | None, str | None]:
+    """저장된 company_page_url 재사용 또는 JD에서 회사 페이지 URL 추출"""
+    company_id = company["id"]
+    company_name = company["name"]
+    stored_company_page_url = (company.get("company_page_url") or "").strip()
+    job_detail_url = (company.get("detail_url") or "").strip()
+
+    if stored_company_page_url:
+        logger.info(f"저장된 회사 페이지 URL 재사용: {company_name}")
+        print("   저장된 회사 페이지 URL 재사용")
+        return stored_company_page_url, job_detail_url or None
+
+    if not job_detail_url:
+        logger.info(f"회사 페이지 URL과 JD URL이 모두 없어 스킵: {company_name}")
+        print("   회사 페이지 URL과 JD URL이 없어 스킵")
+        return None, None
+
+    job_detail_html = crawler.crawl_job_detail_page(job_detail_url)
+    if not job_detail_html:
+        logger.info(f"JD 상세 페이지 로드 실패: {company_name}")
+        print("   JD 상세 페이지 로드 실패")
+        return None, job_detail_url
+
+    company_page_url = parse_company_page_url_from_job_detail(job_detail_html)
+    if not company_page_url:
+        logger.info(f"회사 페이지 링크 추출 실패: {company_name}")
+        print("   회사 페이지 링크 추출 실패")
+        return None, job_detail_url
+
+    if db.update_company_page_url(company_id, company_page_url):
+        logger.info(f"회사 페이지 URL 저장: {company_name} -> {company_page_url}")
+
+    print("   JD에서 회사 페이지 URL 확보")
+    return company_page_url, job_detail_url
+
+
 def run_phase1_for_keyword(keyword: str, config: Config, db: DatabaseManager) -> dict:
     """
     Phase 1: 특정 키워드에 대한 목록 페이지 크롤링 및 DB 저장
@@ -228,27 +268,20 @@ def run_phase2(config: Config, db: DatabaseManager) -> int:
         for i, company in enumerate(companies, 1):
             company_id = company["id"]
             company_name = company["name"]
-            job_detail_url = company["detail_url"]
 
             logger.debug(f"[{i}/{total}] {company_name} 크롤링 중...")
             print(f"\n[{i}/{total}] {company_name}")
 
             try:
-                # 1) JD 상세 페이지 방문
-                job_detail_html = crawler.crawl_job_detail_page(job_detail_url)
-                if not job_detail_html:
-                    logger.info(f"JD 상세 페이지 로드 실패: {company_name}")
-                    print("   JD 상세 페이지 로드 실패")
-                    continue
-
-                # 2) JD 상세 HTML에서 회사 페이지 링크 추출
-                company_page_url = parse_company_page_url_from_job_detail(job_detail_html)
+                company_page_url, job_detail_url = _resolve_phase2_company_page_url(
+                    company,
+                    crawler,
+                    db,
+                )
                 if not company_page_url:
-                    logger.info(f"회사 페이지 링크 추출 실패: {company_name}")
-                    print("   회사 페이지 링크 추출 실패")
                     continue
 
-                # 3) 회사 페이지 방문
+                # 회사 페이지 방문
                 company_html = crawler.crawl_company_page(
                     company_page_url,
                     referer=job_detail_url,
@@ -258,13 +291,13 @@ def run_phase2(config: Config, db: DatabaseManager) -> int:
                     print("   회사 페이지 로드 실패")
                     continue
 
-                # 4) 회사 페이지 HTML 파싱
+                # 회사 페이지 HTML 파싱
                 details = parse_company_detail(company_html)
 
-                # 5) 데이터 검증 및 정제
+                # 데이터 검증 및 정제
                 validated_details = validate_company_details(details)
 
-                # 6) DB 업데이트
+                # DB 업데이트
                 if any(validated_details.values()):
                     db.update_company_details(company_id, validated_details)
                     updated_count += 1

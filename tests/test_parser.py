@@ -160,6 +160,32 @@ class TestParseCompanyDetail:
             == "https://www.jobkorea.co.kr/Recruit/Co_Read/C/35870886"
         )
 
+    def test_extract_company_page_url_from_more_button_fallback(self):
+        """CompanyName 링크가 없으면 MoreButton 링크를 사용해야 한다"""
+        html = """
+        <section id="company-section">
+            <a data-sentry-component="MoreButton" href="/Recruit/Co_Read/C/98765432">
+                기업정보 더보기
+            </a>
+        </section>
+        """
+
+        company_page_url = parse_company_page_url_from_job_detail(html)
+
+        assert company_page_url == "https://www.jobkorea.co.kr/Recruit/Co_Read/C/98765432"
+
+    def test_extract_company_page_url_from_dimension47_fallback(self):
+        """링크가 없으면 dimension47 fallback으로 company id를 복원해야 한다"""
+        html = """
+        <script>
+        window.dataLayer = [{"dimension47":"35870886"}];
+        </script>
+        """
+
+        company_page_url = parse_company_page_url_from_job_detail(html)
+
+        assert company_page_url == "https://www.jobkorea.co.kr/Recruit/Co_Read/C/35870886"
+
     def test_parse_company_page_fixture(self, company_page_html):
         """회사 페이지 fixture에서 핵심 상세 필드를 파싱해야 한다"""
         details = parse_company_detail(company_page_html)

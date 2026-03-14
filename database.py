@@ -119,6 +119,7 @@ class DatabaseManager:
                     industry            VARCHAR(200),
                     employee_count      VARCHAR(50),
                     establishment_year  VARCHAR(20),
+                    company_page_url    TEXT,
                     homepage_url        TEXT,
                     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -171,12 +172,19 @@ class DatabaseManager:
                 );
             """))
 
+            self._ensure_companies_schema(conn)
             self._ensure_job_postings_schema(conn)
             self._backfill_job_posting_lifecycle(conn)
             self._ensure_indexes(conn)
             conn.commit()
 
         logger.info("테이블 생성 완료 (companies, job_postings, crawl_runs, job_posting_history)")
+
+    def _ensure_companies_schema(self, conn):
+        """기존 companies 테이블에 필요한 컬럼 추가"""
+        conn.execute(text(
+            "ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_page_url TEXT"
+        ))
 
     def _ensure_job_postings_schema(self, conn):
         """기존 job_postings 테이블에 필요한 컬럼 추가"""
@@ -475,17 +483,52 @@ class DatabaseManager:
         """Phase 2: 상세 정보가 없는 회사 목록을 회사당 1건씩 반환"""
         with self.engine.connect() as conn:
             result = conn.execute(text("""
-                SELECT DISTINCT ON (c.id) c.id, c.name, jp.detail_url
+                SELECT DISTINCT ON (c.id) c.id, c.name, c.company_page_url, jp.detail_url
                 FROM companies c
-                JOIN job_postings jp ON c.id = jp.company_id
+                LEFT JOIN job_postings jp
+                  ON c.id = jp.company_id
+                 AND jp.detail_url IS NOT NULL
                 WHERE c.company_size IS NULL
-                  AND jp.detail_url IS NOT NULL
-                ORDER BY c.id, COALESCE(jp.last_seen_at, jp.crawled_at) DESC, jp.id DESC
+                  AND (
+                    NULLIF(c.company_page_url, '') IS NOT NULL
+                    OR jp.detail_url IS NOT NULL
+                  )
+                ORDER BY c.id,
+                         COALESCE(jp.last_seen_at, jp.crawled_at) DESC NULLS LAST,
+                         jp.id DESC NULLS LAST
             """))
             return [
-                {"id": row[0], "name": row[1], "detail_url": row[2]}
+                {
+                    "id": row[0],
+                    "name": row[1],
+                    "company_page_url": row[2],
+                    "detail_url": row[3],
+                }
                 for row in result.fetchall()
             ]
+
+    def update_company_page_url(self, company_id: int, company_page_url: str | None) -> bool:
+        """Phase 2: 회사 페이지 URL 저장 또는 갱신"""
+        normalized_url = _normalize_db_field_value(company_page_url)
+        if normalized_url is None:
+            return False
+
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                text("""
+                    UPDATE companies
+                    SET company_page_url = :company_page_url,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :id
+                      AND company_page_url IS DISTINCT FROM :company_page_url
+                """),
+                {
+                    "id": company_id,
+                    "company_page_url": normalized_url,
+                }
+            )
+            conn.commit()
+            return bool(result.rowcount)
 
     def update_company_details(self, company_id: int, details: dict):
         """Phase 2: 회사 상세 정보 업데이트"""

@@ -117,9 +117,16 @@ class FakePhase2DB:
     def __init__(self, companies):
         self._companies = companies
         self.updated = []
+        self.saved_company_page_urls = []
 
     def get_companies_without_details(self):
         return self._companies
+
+    def update_company_page_url(self, company_id, company_page_url):
+        self.saved_company_page_urls.append(
+            {"company_id": company_id, "company_page_url": company_page_url}
+        )
+        return True
 
     def update_company_details(self, company_id, details):
         self.updated.append({"company_id": company_id, "details": details})
@@ -207,6 +214,7 @@ class TestRunPhase2:
                 {
                     "id": 10,
                     "name": "넥스트그라운드",
+                    "company_page_url": None,
                     "detail_url": "https://www.jobkorea.co.kr/Recruit/GI_Read/48674797",
                 }
             ]
@@ -254,6 +262,64 @@ class TestRunPhase2:
                 },
             }
         ]
+        assert db.saved_company_page_urls == [
+            {
+                "company_id": 10,
+                "company_page_url": "https://www.jobkorea.co.kr/Recruit/Co_Read/C/35870886",
+            }
+        ]
+
+    def test_reuses_stored_company_page_url_without_opening_jd(self, monkeypatch):
+        """저장된 company_page_url이 있으면 JD를 다시 열지 않아야 한다"""
+        db = FakePhase2DB(
+            [
+                {
+                    "id": 12,
+                    "name": "캐시회사",
+                    "company_page_url": "https://www.jobkorea.co.kr/Recruit/Co_Read/C/12345678",
+                    "detail_url": "https://www.jobkorea.co.kr/Recruit/GI_Read/22222222",
+                }
+            ]
+        )
+
+        parse_calls = {"company_page_url": 0}
+
+        monkeypatch.setattr(main_module, "JobKoreaCrawler", FakePhase2Crawler)
+
+        def fake_parse_company_page_url_from_job_detail(html):
+            parse_calls["company_page_url"] += 1
+            return "https://www.jobkorea.co.kr/Recruit/Co_Read/C/should-not-be-used"
+
+        monkeypatch.setattr(
+            main_module,
+            "parse_company_page_url_from_job_detail",
+            fake_parse_company_page_url_from_job_detail,
+        )
+        monkeypatch.setattr(
+            main_module,
+            "parse_company_detail",
+            lambda html: {
+                "company_size": "중견기업",
+                "employee_count": "120명",
+                "establishment_year": "2017",
+                "homepage_url": "https://cached.example.com",
+            },
+        )
+        monkeypatch.setattr(main_module, "validate_company_details", lambda details: details)
+
+        updated_count = main_module.run_phase2(object(), db)
+
+        crawler = FakePhase2Crawler.instances[0]
+        assert updated_count == 1
+        assert crawler.job_detail_calls == []
+        assert crawler.company_page_calls == [
+            (
+                "https://www.jobkorea.co.kr/Recruit/Co_Read/C/12345678",
+                "https://www.jobkorea.co.kr/Recruit/GI_Read/22222222",
+            )
+        ]
+        assert parse_calls["company_page_url"] == 0
+        assert db.saved_company_page_urls == []
 
     def test_skips_when_company_page_url_is_missing(self, monkeypatch):
         """JD에서 회사 페이지 링크를 못 찾으면 회사 페이지 방문 없이 스킵해야 한다"""
@@ -262,6 +328,7 @@ class TestRunPhase2:
                 {
                     "id": 11,
                     "name": "링크없음회사",
+                    "company_page_url": None,
                     "detail_url": "https://www.jobkorea.co.kr/Recruit/GI_Read/11111111",
                 }
             ]
@@ -293,3 +360,4 @@ class TestRunPhase2:
         assert crawler.company_page_calls == []
         assert parse_calls["company_detail"] == 0
         assert db.updated == []
+        assert db.saved_company_page_urls == []

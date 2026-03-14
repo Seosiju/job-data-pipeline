@@ -25,8 +25,8 @@
 현재 확인된 제한:
 
 - Phase 1 검색 결과 파서는 `JobList` 우선 + 전역 `CardJob` 폴백 구조로 보정되었지만, 폴백 경로는 여전히 남아 있습니다.
-- Phase 2 메인 경로는 구현되었지만, `company_page_url`를 DB에 저장하지 않아 이후 실행에서도 JD를 다시 열어야 합니다.
-- `scripts/analyze_detail_page.py`는 새 Phase 2 흐름을 아직 반영하지 못했습니다.
+- Phase 2는 `company_page_url` 저장/재사용 경로까지 반영됐지만, 기존 데이터 중 URL이 비어 있는 회사는 첫 보강 시 한 번은 JD를 열어야 합니다.
+- 저장된 `company_page_url`가 실패할 때 JD로 재해결하는 fallback은 아직 없습니다.
 - JD/회사 페이지 selector 검증은 아직 소수 fixture 중심입니다.
 
 ## 2. 현재 구현 흐름
@@ -42,23 +42,27 @@ JobKorea Search
 
 Phase 2
 DatabaseManager.get_companies_without_details()
-  -> JobKoreaCrawler.crawl_job_detail_page(job_detail_url)
-  -> parse_company_page_url_from_job_detail(job_detail_html)
+  -> if companies.company_page_url exists:
+       reuse company_page_url
+     else:
+       JobKoreaCrawler.crawl_job_detail_page(job_detail_url)
+       -> parse_company_page_url_from_job_detail(job_detail_html)
+       -> DatabaseManager.update_company_page_url(company_id, company_page_url)
   -> JobKoreaCrawler.crawl_company_page(company_page_url)
   -> parse_company_detail(company_html)
   -> validate_company_details(details)
   -> DatabaseManager.update_company_details(...)
 ```
 
-위 Phase 2 흐름은 현재 구현 경로를 있는 그대로 적은 것입니다. 여기서 DB에서 가져오는 `detail_url`의 의미는 여전히 JD 상세 URL입니다.
+위 Phase 2 흐름은 현재 구현 경로를 있는 그대로 적은 것입니다. 여기서 `detail_url`의 의미는 여전히 JD 상세 URL이고, `companies.company_page_url`는 회사 상세 페이지 URL 캐시입니다.
 
 ## 2.1 현재 확인된 구조 리스크
 
 - Phase 1 파서 스코프: `parse_job_cards()`는 `JobList` 컨테이너를 우선 사용하지만, 컨테이너를 찾지 못하면 전역 `CardJob`로 폴백합니다.
 - Phase 1 수집 정확성: 현재 fixture 기준 전역 `CardJob`는 `27`개, 메인 `JobList` 내부 카드는 `20`개입니다. live 구조가 크게 바뀌면 폴백 경로에서 다시 과수집될 수 있습니다.
-- Phase 2 시작 URL: 현재 Phase 2는 `companies`에 저장된 회사 URL이 아니라 최신 `job_postings.detail_url`에서 출발합니다.
-- Phase 2 URL 재사용: 회사 페이지 URL을 따로 저장하지 않아 매 실행마다 JD HTML에서 회사 페이지 링크를 다시 추출해야 합니다.
-- 보조 분석 스크립트: `scripts/analyze_detail_page.py`는 아직 JD URL을 `crawl_detail_page()`에 넘기는 예전 가정을 유지하고 있습니다.
+- Phase 2 시작 URL: 저장된 `companies.company_page_url`가 있으면 이를 우선 사용하고, 없을 때만 최신 `job_postings.detail_url`에서 출발합니다.
+- Phase 2 URL 캐시: 새로 찾은 회사 페이지 URL은 `companies.company_page_url`에 저장해 이후 실행에서 재사용합니다.
+- 보조 분석 스크립트: `scripts/analyze_detail_page.py`는 `--mode jd|company`로 현재 흐름에 맞춰 JD 분석과 회사 페이지 분석을 분리합니다.
 
 실제 오케스트레이션은 `main.py`, 크롤링은 `crawler.py`, 파싱은 `parser.py`, 정제는 `validators.py`, DB 처리는 `database.py` 가 담당합니다.
 
@@ -118,6 +122,7 @@ CREATE TABLE IF NOT EXISTS companies (
     industry            VARCHAR(200),
     employee_count      VARCHAR(50),
     establishment_year  VARCHAR(20),
+    company_page_url    TEXT,
     homepage_url        TEXT,
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -128,6 +133,7 @@ CREATE TABLE IF NOT EXISTS companies (
 
 - `name`: 회사명, 유니크
 - `industry`: 목록 카드 기반 업종
+- `company_page_url`: Phase 2가 재사용하는 회사 상세 페이지 URL 캐시
 - `company_size`, `employee_count`, `establishment_year`, `homepage_url`: 상세 페이지 기반 보강 필드
 
 ### 6.2 `job_postings`
@@ -234,7 +240,7 @@ CREATE TABLE IF NOT EXISTS job_posting_history (
 
 ## 8. 보조 스크립트
 
-- `scripts/analyze_detail_page.py`: DB에서 샘플 `detail_url`을 가져와 상세 페이지 구조를 수동 분석하는 보조 스크립트. 현재는 새 Phase 2 흐름과 완전히 동기화되지 않았다.
+- `scripts/analyze_detail_page.py`: `--mode jd|company`로 JD 상세 구조와 저장된 회사 페이지 구조를 각각 분석하는 보조 스크립트
 - `scripts/run_crawler.sh`: cron/systemd 등 스케줄러에서 `main.py` 실행
 - `scripts/manual_test_crawler.py`: 초기에 만든 수동 1페이지 CSV 점검 스크립트
 
@@ -244,6 +250,7 @@ CREATE TABLE IF NOT EXISTS job_posting_history (
 
 현재 테스트 구성:
 
+- `tests/test_analyze_detail_page.py`
 - `tests/test_config.py`
 - `tests/test_parser.py`
 - `tests/test_main.py`
@@ -253,18 +260,18 @@ CREATE TABLE IF NOT EXISTS job_posting_history (
 실행 결과 기준:
 
 ```text
-91 passed
+100 passed
 ```
 
 ## 10. 현재 구현상 참고사항
 
 - `main.py`는 사용자 진행 상황을 콘솔에 출력하고, 내부 모듈은 로깅 중심으로 동작합니다.
 - `job_postings`는 신규/변경/재확인 상태를 구분해 집계하고, `crawl_runs.jobs_collected`는 신규 insert 기준으로 기록합니다.
-- `get_companies_without_details()`는 회사당 최신 `detail_url` 1건만 선택합니다.
+- `get_companies_without_details()`는 회사당 저장된 `company_page_url`와 최신 `detail_url` 1건을 함께 선택합니다.
 - 현재 `job_postings.detail_url`의 의미는 JD 상세 URL입니다.
-- 현재 Phase 2의 메인 경로는 `JD 상세 -> 회사 페이지 링크 추출 -> 회사 페이지 방문 -> 회사 정보 파싱`입니다.
+- 현재 Phase 2의 메인 경로는 `저장된 company_page_url 재사용 -> 회사 페이지 방문` 또는 `JD 상세 -> 회사 페이지 링크 추출/저장 -> 회사 페이지 방문`입니다.
 - 일정 기간 재발견되지 않은 공고는 `stale` 상태로 전환됩니다.
 
-현재 기준으로는 Phase 2 후속 안정화, `company_page_url` 저장 구조 판단, fixture 확대가 우선 작업입니다. 이 문서는 "구현되어 있는 경로"를 설명하며, 남은 한계는 위 제한사항을 따릅니다.
+현재 기준으로는 Phase 2 URL 재사용 경로의 live 검증, fixture 확대, fallback 보강 판단이 우선 작업입니다. 이 문서는 "구현되어 있는 경로"를 설명하며, 남은 한계는 위 제한사항을 따릅니다.
 
 이 문서는 위 참고사항을 포함해, 현재 코드가 실제로 어떻게 동작하는지를 설명하는 데 목적이 있습니다.

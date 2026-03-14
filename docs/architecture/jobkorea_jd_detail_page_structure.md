@@ -379,13 +379,15 @@ JD company page URL not found: <job_detail_url>
 현재 코드 기준으로 반영된 사항:
 
 - JD -> 회사 페이지 URL 추출 함수가 추가되었다.
+- 추출된 회사 페이지 URL을 `companies.company_page_url`에 저장한다.
+- 저장된 `company_page_url`가 있으면 이후 Phase 2에서 JD 재방문을 건너뛴다.
 - Phase 2는 JD를 먼저 열고 회사 페이지 URL을 얻은 뒤 회사 페이지를 방문한다.
 - `parse_company_detail()`는 JD HTML과 회사 페이지 HTML을 구분한다.
 
 현재 기준의 남은 권장 보강:
 
 - JD 내부 `CorpInformationBox` 값을 회사 페이지 실패 시 fallback 보강 데이터로 쓸지 결정
-- 회사 페이지 URL을 DB에 저장해 매 실행마다 JD를 다시 열지 않도록 할지 결정
+- 저장된 `company_page_url`가 실패할 때 JD로 재해결 fallback을 넣을지 결정
 
 ## 10. 테스트 포인트
 

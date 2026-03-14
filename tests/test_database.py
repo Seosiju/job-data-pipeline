@@ -123,6 +123,24 @@ class TestDatabaseManager:
             pytest.fail(f"create_tables raised exception: {e}")
 
     @requires_db
+    def test_create_tables_adds_company_page_url_column(self):
+        """companies 테이블에 company_page_url 컬럼이 존재해야 한다"""
+        db = get_real_db_manager()
+        db.create_tables()
+
+        with db.connect() as conn:
+            column_exists = conn.execute(
+                text("""
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_name = 'companies'
+                      AND column_name = 'company_page_url'
+                """)
+            ).fetchone()
+
+        assert column_exists is not None
+
+    @requires_db
     def test_connection_context_manager(self):
         """connect()가 context manager로 동작하는지 확인"""
         db = get_real_db_manager()
@@ -170,6 +188,35 @@ class TestGetOrCreateCompany:
             id2 = db.get_or_create_company(conn, company_name, "IT")
 
             assert id1 == id2
+
+    @requires_db
+    def test_update_company_page_url_persists_value(self):
+        """company_page_url 저장 경로가 동작해야 한다"""
+        db = get_real_db_manager()
+        db.create_tables()
+
+        with db.connect() as conn:
+            company_name = f"회사URL테스트_{uuid.uuid4().hex[:8]}"
+            company_id = db.get_or_create_company(conn, company_name, "IT")
+            conn.commit()
+
+        changed = db.update_company_page_url(
+            company_id,
+            "https://www.jobkorea.co.kr/Recruit/Co_Read/C/55555555",
+        )
+
+        with db.connect() as conn:
+            row = conn.execute(
+                text("""
+                    SELECT company_page_url
+                    FROM companies
+                    WHERE id = :id
+                """),
+                {"id": company_id},
+            ).mappings().one()
+
+        assert changed is True
+        assert row["company_page_url"] == "https://www.jobkorea.co.kr/Recruit/Co_Read/C/55555555"
 
 
 class TestInsertJobPosting:
@@ -508,7 +555,49 @@ class TestInsertJobPosting:
         matched = [row for row in companies if row["name"] == company_name]
 
         assert matched == [
-            {"id": company_id, "name": company_name, "detail_url": latest_url}
+            {
+                "id": company_id,
+                "name": company_name,
+                "company_page_url": None,
+                "detail_url": latest_url,
+            }
+        ]
+
+    @requires_db
+    def test_get_companies_without_details_includes_saved_company_page_url(self):
+        """저장된 company_page_url이 있으면 Phase 2 재사용 대상에 포함되어야 한다"""
+        db = get_real_db_manager()
+        db.create_tables()
+
+        with db.connect() as conn:
+            unique_id = uuid.uuid4().hex[:8]
+            company_name = f"회사URL재사용테스트_{unique_id}"
+            detail_url = f"https://example.com/company-cache/{unique_id}"
+            company_page_url = f"https://www.jobkorea.co.kr/Recruit/Co_Read/C/{unique_id}"
+            company_id = db.get_or_create_company(conn, company_name)
+            db.insert_job_posting(
+                conn,
+                company_id,
+                {
+                    "title": "회사 페이지 재사용 공고",
+                    "detail_url": detail_url,
+                },
+                keyword="데이터분석가",
+            )
+            conn.commit()
+
+        db.update_company_page_url(company_id, company_page_url)
+
+        companies = db.get_companies_without_details()
+        matched = [row for row in companies if row["name"] == company_name]
+
+        assert matched == [
+            {
+                "id": company_id,
+                "name": company_name,
+                "company_page_url": company_page_url,
+                "detail_url": detail_url,
+            }
         ]
 
 
