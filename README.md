@@ -37,11 +37,11 @@ jobkorea/
 │   ├── test_parser.py
 │   └── test_validators.py
 └── docs/
+    ├── archive/
     ├── status/
     ├── architecture/
     ├── guides/
     ├── plans/
-    ├── refactoring/
     └── reports/
 ```
 
@@ -50,7 +50,8 @@ jobkorea/
 - 루트: 실제 실행 경로와 핵심 모듈
 - `scripts/`: 수동 점검, 보조 분석, 스케줄링 스크립트
 - `tests/`: 자동 테스트
-- `docs/`: 상태, 설계, 가이드, 계획, 리포트
+- `docs/`: 상태, 설계, runbook, active 계획, 최근 결과
+- `docs/archive/`: 과거 계획/결과/리팩토링 기록
 
 ## 문서 분류 규칙
 
@@ -58,10 +59,10 @@ jobkorea/
 
 - `status/`: 지금 상태와 다음 세션 handoff
 - `architecture/`: 현재 구조, 스키마, 설계 원칙
-- `plans/`: 아직 시작하지 않았거나 진행 중인 작업 계획
+- `plans/`: 현재 active plan만 유지
 - `guides/`: 실행법, 설정법, 운영 절차
-- `refactoring/`: 구조 변경 기록과 Before/After
-- `reports/`: 완료 후 결과 정리. 현재 source of truth가 아닐 수 있음
+- `reports/`: 최근 완료 결과 중 현재도 참고 가치가 높은 문서
+- `archive/`: 과거 plan/report/refactoring/legacy guide
 
 판단 기준은 간단합니다.
 
@@ -69,7 +70,7 @@ jobkorea/
 - 작업 후 결과면 `reports/`
 - 현재 구조의 상세 설명이면 `architecture/`
 - 실행/운영 방법이면 `guides/`
-- 구조 변경 기록이면 `refactoring/`
+- 과거 기록이면 `archive/`
 - 지금 상태의 압축 요약이면 `status/`
 
 ## 빠른 시작
@@ -215,8 +216,9 @@ pytest tests/ -q
 - 현재 상태 요약: `docs/status/current_status.md`
 - 최근 세션 handoff: `docs/status/session_handoff.md`
 - 문서 분류 규칙: `docs/README.md`
+- 작업 규칙: `AGENTS.md`
 - 운영/설정 가이드: `docs/guides/`
-- 리팩토링 기록: `docs/refactoring/`
 - 완료 보고서: `docs/reports/`
+- 과거 기록: `docs/archive/`
 
 `docs/reports/` 문서는 현재 source of truth가 아니라 historical snapshot으로 보는 것이 맞습니다.

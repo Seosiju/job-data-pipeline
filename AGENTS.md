@@ -23,3 +23,30 @@ When a user names one of these agents, references one of these files, or asks fo
 - If multiple agents apply, use the minimal set and state the order briefly.
 - If the request only partially matches an agent, use the agent's domain guidance but keep the repository's existing code and conventions authoritative.
 - If an agent file is missing or outdated, continue with normal repository analysis and note the gap briefly.
+
+## Working Agreement
+
+When executing implementation work in this repository, prefer the following default flow unless the user explicitly asks for something narrower:
+
+1. Clarify the target change and write or refine the plan first.
+2. Critically review the plan before implementation.
+3. Check whether the plan is over-engineered for the current stage.
+4. Implement the change.
+5. Review whether the implementation actually matches the goal.
+6. Review for bugs, regressions, security issues, side effects, and user-flow problems.
+7. Reuse or integrate existing code where possible instead of duplicating logic.
+8. Split very large files or functions when the change would otherwise make them harder to maintain.
+9. Remove dead code or outdated paths created by the change.
+10. Re-review the full diff before considering the work complete.
+
+## Review Standard
+
+By default, review comments should prioritize:
+
+1. correctness
+2. behavioural regression risk
+3. data quality risk
+4. security and operational risk
+5. maintainability
+
+A change is not considered complete just because tests pass. The implementation should also be coherent with the user-facing goal and the repository's current architecture.

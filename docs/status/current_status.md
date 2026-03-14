@@ -69,9 +69,8 @@
 
 즉시 실행용 문서:
 
-- `docs/reports/phase1_correctness_audit_report.md`
+- `docs/plans/data_pipeline_service_roadmap.md`
 - `docs/reports/phase2_company_page_fix_review.md`
-- `docs/plans/phase2_company_page_fix_plan.md`
 
 ## Guardrails
 

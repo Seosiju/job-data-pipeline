@@ -1,4 +1,16 @@
-# Phase 1 - 첫 크롤링 테스트 기획서
+---
+type: plan
+status: historical
+last_reviewed: 2026-03-14
+superseded_by: docs/plans/data_pipeline_service_roadmap.md
+related_report:
+source_of_truth: false
+---
+
+# Phase 1 - 첫 크롤링 테스트 기획서 (Historical Snapshot)
+
+> 상태: Historical snapshot
+> 주의: CSV 1페이지 수동 검증 단계의 초기 부트스트랩 문서입니다. 현재 실행 경로와 디렉터리 구조는 이 문서와 다릅니다.
 
 ## 목표
 

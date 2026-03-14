@@ -1,8 +1,25 @@
-# Phase 2 회사 페이지 전환 수정 기획서
+---
+type: plan
+status: historical
+last_reviewed: 2026-03-14
+superseded_by: docs/plans/data_pipeline_service_roadmap.md
+related_report: docs/reports/phase2_company_page_fix_review.md
+source_of_truth: false
+---
+
+# Phase 2 회사 페이지 전환 수정 기획서 (Historical Snapshot)
 
 > 작성일: 2026-03-14
 > 기준: 현재 워킹트리, `log/crawler.log`, `log/error.log`
 > 목적: 다른 에이전트가 현재 Phase 2 장애와 수정 방향을 바로 이해하고 이어서 구현할 수 있게 정리한 문서
+> 상태: Historical snapshot
+> 결과: 메인 경로 구현 완료, 검토 결과는 `docs/reports/phase2_company_page_fix_review.md`
+
+## 0. 현재 관점에서 보면
+
+이 문서가 정의한 핵심 수정 목표인 `JD 상세 -> 회사 페이지 링크 추출 -> 회사 페이지 방문 -> 회사 정보 파싱` 메인 경로는 구현되었습니다.
+
+현재는 이 문서를 active plan으로 쓰기보다, 당시 문제 정의와 변경 의도를 이해하는 reference로 보는 편이 맞습니다. 남은 후속 과제는 `company_page_url` 저장, helper script 정리, fixture 확대입니다.
 
 ## 1. 한 줄 요약
 

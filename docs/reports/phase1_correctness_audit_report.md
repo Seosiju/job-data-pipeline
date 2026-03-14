@@ -2,7 +2,7 @@
 
 > 작성일: 2026-03-14
 > 상태: Historical snapshot
-> 실행 기준 문서: `docs/plans/phase1_correctness_audit_plan.md`
+> 실행 기준 문서: `docs/archive/plans/phase1_correctness_audit_plan.md`
 > 이 문서는 2026-03-14 시점 감사 결과와 검증 결과를 정리한 완료 보고서입니다.
 > 현재 동작의 source of truth는 `parser.py`, `tests/test_parser.py`, `docs/architecture/jobkorea_search_results_page_structure.md` 입니다.
 
@@ -159,6 +159,6 @@ fixture `tests/fixtures/jobkorea_search_page_02.html` 기준:
 
 ## 참고 문서
 
-- `docs/plans/phase1_correctness_audit_plan.md`
+- `docs/archive/plans/phase1_correctness_audit_plan.md`
 - `docs/architecture/jobkorea_search_results_page_structure.md`
 - `tests/fixtures/jobkorea_search_page_02.html`

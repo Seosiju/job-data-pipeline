@@ -1,4 +1,16 @@
-# Phase 2 - 본 시스템 구현 기획서
+---
+type: plan
+status: historical
+last_reviewed: 2026-03-14
+superseded_by: docs/plans/data_pipeline_service_roadmap.md
+related_report:
+source_of_truth: false
+---
+
+# Phase 2 - 본 시스템 구현 기획서 (Historical Snapshot)
+
+> 상태: Historical snapshot
+> 주의: 현재 코드베이스의 실제 구조는 이미 이 문서의 다수 항목을 반영했습니다. 현재 기준 판단은 `README.md`, `docs/architecture/system_architecture.md`, 실제 소스코드를 우선합니다.
 
 ## 목표
 

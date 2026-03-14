@@ -20,7 +20,7 @@
 
 - 실행 시작점: `main.py`
 - 현재 구조 설명: `docs/architecture/system_architecture.md`
-- Phase 2 수정 계획: `docs/plans/phase2_company_page_fix_plan.md`
+- 현재 active plan: `docs/plans/data_pipeline_service_roadmap.md`
 - Phase 2 구현 리뷰: `docs/reports/phase2_company_page_fix_review.md`
 - 중장기 로드맵: `docs/plans/data_pipeline_service_roadmap.md`
 - 지금 상태 요약: `docs/status/current_status.md`

@@ -1,8 +1,17 @@
-# 다음 단계 실행 기획서 (Transitional Snapshot)
+---
+type: plan
+status: historical
+last_reviewed: 2026-03-14
+superseded_by: docs/plans/data_pipeline_service_roadmap.md
+related_report:
+source_of_truth: false
+---
+
+# 다음 단계 실행 기획서 (Historical Snapshot)
 
 > 작성일: 2026-03-13
 > 기준: 현재 워킹트리와 실제 파일 구조
-> 상태: Transitional snapshot
+> 상태: Historical snapshot
 > 주의: 이 문서는 "정확한 실행 통계 / 증분 크롤링 / 상태-이력 / 운영성 정리"를 실제 구현하기 직전의 실행 계획을 기반으로 합니다.
 > 현재 기준 판단은 `docs/status/current_status.md`, `docs/architecture/system_architecture.md`, `docs/plans/data_pipeline_service_roadmap.md`를 우선합니다.
 
@@ -17,7 +26,7 @@
 - 수동 스크립트 `scripts/` 이동
 - 로그/출력 1차 정리
 
-따라서 이 문서는 "앞으로 해야 할 일 목록"이라기보다, 해당 배치가 어떤 문제를 해결하려고 했는지 이해하는 참고 문서로 보는 편이 맞습니다.
+따라서 이 문서는 현재 active plan이 아니라, 해당 배치가 어떤 문제를 해결하려고 했는지 이해하는 historical reference로 보는 편이 맞습니다.
 
 ## 1. 배경
 
