@@ -1,12 +1,12 @@
 """
-잡코리아 크롤링 Phase 1 - 테스트 크롤러
+잡코리아 크롤링 Phase 1 - 수동 점검 크롤러
 =========================================
 목적: 1페이지만 크롤링하여 데이터 품질 확인
 출력: output/test_result.csv
 
 사용법:
     pip install -r requirements.txt
-    python test_crawler.py
+    python scripts/manual_test_crawler.py
 """
 
 import os
@@ -14,6 +14,7 @@ import time
 import random
 import csv
 from datetime import datetime
+from pathlib import Path
 
 from dotenv import load_dotenv
 from selenium import webdriver
@@ -29,7 +30,8 @@ from bs4 import BeautifulSoup
 # ============================================================
 # 설정
 # ============================================================
-load_dotenv()
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(PROJECT_ROOT / ".env")
 
 SEARCH_KEYWORD = os.getenv("SEARCH_KEYWORD", "데이터분석가")
 MAX_PAGES = int(os.getenv("MAX_PAGES", "1"))
@@ -62,8 +64,8 @@ COLUMNS = [
     "detail_url",   # 상세 URL
 ]
 
-OUTPUT_DIR = "output"
-OUTPUT_FILE = os.path.join(OUTPUT_DIR, "test_result.csv")
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_FILE = OUTPUT_DIR / "test_result.csv"
 
 
 # ============================================================

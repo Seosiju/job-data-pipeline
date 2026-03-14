@@ -2,104 +2,181 @@
 test_parser.py - Parser 모듈 단위 테스트
 """
 
+from pathlib import Path
+
 import pytest
-from parser import parse_job_cards, parse_company_detail, extract_card_data
 from bs4 import BeautifulSoup
+
+from parser import (
+    extract_card_data,
+    parse_company_detail,
+    parse_company_page_url_from_job_detail,
+    parse_job_cards,
+)
+
+
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
+SEARCH_RESULTS_FIXTURE = FIXTURES_DIR / "jobkorea_search_page_02.html"
+JD_DETAIL_FIXTURE = FIXTURES_DIR / "jobkorea_jd_detail_02.html"
+COMPANY_PAGE_FIXTURE = FIXTURES_DIR / "jobkorea_company_page_02.html"
+
+
+@pytest.fixture
+def sample_list_html():
+    """Phase 1 검색 결과 페이지 샘플 HTML"""
+    return SEARCH_RESULTS_FIXTURE.read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def jd_detail_html():
+    """JD 상세 페이지 fixture"""
+    return JD_DETAIL_FIXTURE.read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def company_page_html():
+    """회사 페이지 fixture"""
+    return COMPANY_PAGE_FIXTURE.read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def sample_detail_html():
+    """상세 페이지 파서 회귀용 최소 샘플 HTML"""
+    return """
+    <dl>
+        <dt>기업규모</dt><dd>중견기업</dd>
+        <dt>사원수</dt><dd>500명</dd>
+        <dt>설립일</dt><dd>2010년</dd>
+        <dt>홈페이지</dt>
+        <dd><a href="https://example.com">https://example.com</a></dd>
+    </dl>
+    """
+
+
+@pytest.fixture
+def search_results_soup(sample_list_html):
+    return BeautifulSoup(sample_list_html, "html.parser")
+
+
+@pytest.fixture
+def job_list_cards(search_results_soup):
+    job_list = search_results_soup.select_one('[data-sentry-component="JobList"]')
+    assert job_list is not None
+    return job_list.select('[data-sentry-component="CardJob"]')
 
 
 class TestParseJobCards:
-    """parse_job_cards 함수 테스트"""
+    """Phase 1 검색 결과 카드 파싱 테스트"""
 
-    def test_parse_multiple_cards(self, sample_list_html):
-        """여러 카드가 있는 HTML 파싱"""
+    def test_parse_job_cards_does_not_print_to_stdout(self, sample_list_html, capsys):
+        """파서는 표준출력 대신 로깅을 사용한다"""
+        parse_job_cards(sample_list_html)
+        captured = capsys.readouterr()
+
+        assert captured.out == ""
+
+    def test_parse_job_cards_uses_joblist_scope_only(
+        self,
+        sample_list_html,
+        search_results_soup,
+        job_list_cards,
+    ):
+        """전역 CardJob가 아니라 JobList 내부 CardJob만 파싱해야 한다"""
+        assert len(search_results_soup.select('[data-sentry-component="CardJob"]')) == 27
+        assert len(job_list_cards) == 20
+
         jobs = parse_job_cards(sample_list_html)
 
-        assert len(jobs) == 3
-        assert jobs[0]["company"] == "테스트회사"
-        assert jobs[1]["company"] == "샘플기업"
-        assert jobs[2]["company"] == "미니멀컴퍼니"
+        assert len(jobs) == 20
+        assert jobs[0]["company"] == "킨코스코리아㈜"
+        assert jobs[0]["title"] == "킨코스코리아㈜ 영업부문 사업기획팀/영업직/디자인그룹 경력 및 신입사원 모집"
 
-    def test_parse_empty_html(self, empty_html):
-        """빈 HTML 파싱 시 빈 리스트 반환"""
-        jobs = parse_job_cards(empty_html)
-        assert jobs == []
+    def test_parse_card_primary_fields_on_first_job(self, sample_list_html):
+        """첫 카드에서 JD URL, 제목, 회사명을 추출해야 한다"""
+        jobs = parse_job_cards(sample_list_html)
+        first_job = jobs[0]
 
-    def test_parse_card_title(self, sample_list_html):
-        """공고 제목 파싱"""
+        assert (
+            first_job["detail_url"]
+            == "https://www.jobkorea.co.kr/Recruit/GI_Read/48724493?Oem_Code=C1&logpath=1&stext=%EC%82%AC%EC%97%85%EA%B8%B0%ED%9A%8D&listno=1&sc=630"
+        )
+        assert first_job["title"] == "킨코스코리아㈜ 영업부문 사업기획팀/영업직/디자인그룹 경력 및 신입사원 모집"
+        assert first_job["company"] == "킨코스코리아㈜"
+
+    def test_parse_card_location_industry_and_job_category(self, sample_list_html):
+        """위치 chip과 업종/직무 chip을 분리해서 읽어야 한다"""
+        jobs = parse_job_cards(sample_list_html)
+        first_job = jobs[0]
+
+        assert first_job["location"] == "서울 금천구 외 3"
+        assert first_job["industry"] == "출판·인쇄·사진"
+        assert first_job["job_category"] == "경영·비즈니스기획, 채널관리자, 제품디자이너"
+
+    def test_parse_salary_when_chip_exists_and_when_missing(self, sample_list_html):
+        """급여 chip 유무에 따라 빈 문자열 또는 실제 급여를 반환해야 한다"""
+        jobs = parse_job_cards(sample_list_html)
+        salary_job = next(job for job in jobs if job["title"] == "사업기획 및 연구지원")
+
+        assert jobs[0]["salary"] == ""
+        assert salary_job["salary"] == "연봉 4,000~6,000만원"
+        assert salary_job["industry"] == "무역·상사"
+        assert salary_job["job_category"] == "백화점·유통·도소매, 쇼핑몰·오픈마켓·소셜커머스, 식품가공"
+
+    def test_parse_apply_type_uses_button_text(self, sample_list_html):
+        """지원 방식은 버튼 텍스트 기준으로 읽어야 한다"""
         jobs = parse_job_cards(sample_list_html)
 
-        assert jobs[0]["title"] == "시니어 데이터 분석가"
-        assert jobs[1]["title"] == "주니어 데이터 엔지니어"
+        assert jobs[0]["apply_type"] == "즉시 지원"
+        assert jobs[1]["apply_type"] == "홈페이지 지원"
+        assert {job["apply_type"] for job in jobs} <= {"즉시 지원", "홈페이지 지원"}
 
-    def test_parse_card_location(self, sample_list_html):
-        """근무지역 파싱"""
+    def test_parse_job_cards_ignores_result_count_mismatch(self, sample_list_html):
+        """8,515 vs 8,513 결과 수 차이가 있어도 카드 파싱은 정상 동작해야 한다"""
+        assert "8,515" in sample_list_html
+        assert "8,513" in sample_list_html
+
         jobs = parse_job_cards(sample_list_html)
 
-        assert jobs[0]["location"] == "서울 강남구"
-        assert jobs[1]["location"] == "경기 성남시"
+        assert len(jobs) == 20
 
-    def test_parse_card_detail_url(self, sample_list_html):
-        """상세 URL 파싱"""
+    def test_all_parsed_cards_have_jd_url_title_and_company(self, sample_list_html):
+        """메인 목록에 포함된 모든 카드는 JD URL, 제목, 회사명이 있어야 한다"""
         jobs = parse_job_cards(sample_list_html)
 
-        assert "12345678" in jobs[0]["detail_url"]
-        assert "87654321" in jobs[1]["detail_url"]
-        assert jobs[0]["detail_url"].startswith("https://www.jobkorea.co.kr")
-
-    def test_parse_card_experience(self, sample_list_html):
-        """경력 조건 파싱"""
-        jobs = parse_job_cards(sample_list_html)
-
-        assert jobs[0]["experience"] == "경력 3년↑"
-        assert jobs[1]["experience"] == "신입·경력"
-
-    def test_parse_card_industry(self, sample_list_html):
-        """업종/직무 파싱"""
-        jobs = parse_job_cards(sample_list_html)
-
-        assert jobs[0]["industry"] == "IT·인터넷"
-        assert "데이터분석" in jobs[0]["job_category"]
-
-    def test_parse_card_salary(self, sample_list_html):
-        """급여 정보 파싱"""
-        jobs = parse_job_cards(sample_list_html)
-
-        assert jobs[0]["salary"] == "4000만원 이상"
-
-    def test_parse_card_badge(self, sample_list_html):
-        """뱃지 파싱"""
-        jobs = parse_job_cards(sample_list_html)
-
-        assert jobs[0]["badge"] == "적극채용중"
-
-    def test_parse_card_apply_type(self, sample_list_html):
-        """지원 방식 파싱"""
-        jobs = parse_job_cards(sample_list_html)
-
-        assert jobs[0]["apply_type"] == "즉시지원"
-
-    def test_parse_card_dates(self, sample_list_html):
-        """등록일/마감일 파싱"""
-        jobs = parse_job_cards(sample_list_html)
-
-        assert "등록" in jobs[0]["posted_date"]
-        assert "마감" in jobs[0]["deadline"]
-
-    def test_parse_minimal_card(self, sample_list_html):
-        """최소 정보만 있는 카드 파싱"""
-        jobs = parse_job_cards(sample_list_html)
-
-        # 세 번째 카드는 최소 정보만 있음
-        minimal_job = jobs[2]
-        assert minimal_job["title"] == "데이터 사이언티스트"
-        assert minimal_job["company"] == "미니멀컴퍼니"
-        # 없는 필드는 빈 문자열
-        assert minimal_job["location"] == ""
-        assert minimal_job["detail_url"] == ""
+        assert all(job["detail_url"].startswith("https://www.jobkorea.co.kr/Recruit/GI_Read/") for job in jobs)
+        assert all(job["title"] for job in jobs)
+        assert all(job["company"] for job in jobs)
 
 
 class TestParseCompanyDetail:
     """parse_company_detail 함수 테스트"""
+
+    def test_extract_company_page_url_from_jd_fixture(self, jd_detail_html):
+        """JD 상세 fixture에서 회사 페이지 URL을 추출해야 한다"""
+        company_page_url = parse_company_page_url_from_job_detail(jd_detail_html)
+
+        assert (
+            company_page_url
+            == "https://www.jobkorea.co.kr/Recruit/Co_Read/C/35870886"
+        )
+
+    def test_parse_company_page_fixture(self, company_page_html):
+        """회사 페이지 fixture에서 핵심 상세 필드를 파싱해야 한다"""
+        details = parse_company_detail(company_page_html)
+
+        assert details["company_size"] == "중소기업"
+        assert details["employee_count"] == "23명"
+        assert details["establishment_year"] == "2021"
+        assert details["homepage_url"] == "https://zippoom.com/"
+
+    def test_parse_company_detail_returns_empty_for_jd_fixture(self, jd_detail_html):
+        """JD 상세 HTML은 회사 페이지 파서가 비워서 반환해야 한다"""
+        details = parse_company_detail(jd_detail_html)
+
+        assert details["company_size"] is None
+        assert details["employee_count"] is None
+        assert details["establishment_year"] is None
+        assert details["homepage_url"] is None
 
     def test_parse_company_size(self, sample_detail_html):
         """기업규모 파싱"""
@@ -166,27 +243,39 @@ class TestParseCompanyDetail:
 class TestExtractCardData:
     """extract_card_data 함수 테스트"""
 
-    def test_extract_returns_dict(self, sample_list_html):
+    def test_extract_returns_dict(self, job_list_cards):
         """반환값이 딕셔너리인지 확인"""
-        soup = BeautifulSoup(sample_list_html, "html.parser")
-        card = soup.find("div", attrs={"data-sentry-component": "CardJob"})
-
-        result = extract_card_data(card)
+        result = extract_card_data(job_list_cards[0])
 
         assert isinstance(result, dict)
 
-    def test_extract_all_fields_present(self, sample_list_html):
+    def test_extract_all_fields_present(self, job_list_cards):
         """모든 필드가 존재하는지 확인"""
-        soup = BeautifulSoup(sample_list_html, "html.parser")
-        card = soup.find("div", attrs={"data-sentry-component": "CardJob"})
-
-        result = extract_card_data(card)
+        result = extract_card_data(job_list_cards[0])
 
         expected_fields = [
-            "title", "company", "location", "experience",
-            "detail_url", "industry", "job_category", "salary",
-            "badge", "apply_type", "posted_date", "deadline", "benefits"
+            "title",
+            "company",
+            "location",
+            "experience",
+            "detail_url",
+            "industry",
+            "job_category",
+            "salary",
+            "badge",
+            "apply_type",
+            "posted_date",
+            "deadline",
+            "benefits",
         ]
 
         for field in expected_fields:
             assert field in result
+
+    def test_extract_salary_card(self, job_list_cards):
+        """급여 chip이 있는 카드도 extract_card_data에서 정확히 읽어야 한다"""
+        result = extract_card_data(job_list_cards[10])
+
+        assert result["title"] == "사업기획 및 연구지원"
+        assert result["salary"] == "연봉 4,000~6,000만원"
+        assert result["apply_type"] == "즉시 지원"

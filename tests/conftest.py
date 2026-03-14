@@ -27,6 +27,9 @@ TEST_ENV_DEFAULTS = {
     "HEADLESS": "true",
     "REQUEST_DELAY_MIN": "2",
     "REQUEST_DELAY_MAX": "5",
+    "RETRY_ATTEMPTS": "3",
+    "CONSECUTIVE_DUPLICATE_THRESHOLD": "20",
+    "STALE_AFTER_DAYS": "7",
     "LOG_LEVEL": "INFO",
     "LOG_DIR": "log",
 }
@@ -78,6 +81,9 @@ def mock_env(monkeypatch):
     monkeypatch.setenv("SEARCH_KEYWORDS", "테스트키워드")
     monkeypatch.setenv("MAX_PAGES", "3")
     monkeypatch.setenv("HEADLESS", "false")
+    monkeypatch.setenv("RETRY_ATTEMPTS", "5")
+    monkeypatch.setenv("CONSECUTIVE_DUPLICATE_THRESHOLD", "7")
+    monkeypatch.setenv("STALE_AFTER_DAYS", "14")
 
     # Config 모듈 reload하여 새 환경변수 적용
     if "config" in sys.modules:

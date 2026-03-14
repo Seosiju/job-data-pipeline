@@ -14,7 +14,11 @@ PROJECT_ROOT = Path(__file__).parent
 
 
 def setup_logging(log_level: str = "INFO", log_dir: str = "log") -> logging.Logger:
-    """로깅 시스템 초기화"""
+    """로깅 시스템 초기화.
+
+    콘솔은 경고/에러 위주로 간결하게 유지하고,
+    상세 진행 상황은 파일 로그에 남긴다.
+    """
     log_path = PROJECT_ROOT / log_dir
     log_path.mkdir(exist_ok=True)
 
@@ -51,7 +55,7 @@ def setup_logging(log_level: str = "INFO", log_dir: str = "log") -> logging.Logg
 
     # 콘솔 핸들러
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(logging.WARNING)
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
 
@@ -81,6 +85,11 @@ class Config:
     DELAY_MIN: int = int(os.getenv("REQUEST_DELAY_MIN", "2"))
     DELAY_MAX: int = int(os.getenv("REQUEST_DELAY_MAX", "5"))
     HEADLESS: bool = os.getenv("HEADLESS", "true").lower() == "true"
+    RETRY_ATTEMPTS: int = int(os.getenv("RETRY_ATTEMPTS", "3"))
+    CONSECUTIVE_DUPLICATE_THRESHOLD: int = int(
+        os.getenv("CONSECUTIVE_DUPLICATE_THRESHOLD", "20")
+    )
+    STALE_AFTER_DAYS: int = int(os.getenv("STALE_AFTER_DAYS", "7"))
 
     # 로깅 설정
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
@@ -105,5 +114,14 @@ class Config:
 
         if not self.SEARCH_KEYWORDS or self.SEARCH_KEYWORDS == [""]:
             warnings.append("SEARCH_KEYWORDS가 비어있습니다")
+
+        if self.RETRY_ATTEMPTS < 1:
+            warnings.append("RETRY_ATTEMPTS는 1 이상이어야 합니다")
+
+        if self.CONSECUTIVE_DUPLICATE_THRESHOLD < 1:
+            warnings.append("CONSECUTIVE_DUPLICATE_THRESHOLD는 1 이상이어야 합니다")
+
+        if self.STALE_AFTER_DAYS < 1:
+            warnings.append("STALE_AFTER_DAYS는 1 이상이어야 합니다")
 
         return warnings

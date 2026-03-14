@@ -2,16 +2,23 @@
 analyze_detail_page.py - 상세 페이지 HTML 구조 분석용 스크립트
 
 사용법:
-    python analyze_detail_page.py
+    python scripts/analyze_detail_page.py
 
 DB에서 detail_url을 가져와 HTML을 저장하고 구조를 분석합니다.
 """
 
+import sys
+from pathlib import Path
+
+from bs4 import BeautifulSoup
+from sqlalchemy import text
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
 from config import Config
 from crawler import JobKoreaCrawler
 from database import get_engine
-from sqlalchemy import text
-from bs4 import BeautifulSoup
 
 
 def get_sample_detail_url():
@@ -85,7 +92,8 @@ def main():
 
         if html:
             # HTML 파일로 저장
-            output_path = "output/sample_detail.html"
+            output_path = PROJECT_ROOT / "output" / "sample_detail.html"
+            output_path.parent.mkdir(exist_ok=True)
             with open(output_path, "w", encoding="utf-8") as f:
                 f.write(html)
             print(f"\n✅ HTML 저장: {output_path}")

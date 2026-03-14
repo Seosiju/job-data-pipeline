@@ -97,6 +97,115 @@ class JobKoreaCrawler:
         time.sleep(cooldown)
         self.consecutive_failures = 0
 
+    def _set_referer(self, referer: str):
+        """다음 요청의 Referer 헤더 설정"""
+        self.driver.execute_cdp_cmd(
+            "Network.setExtraHTTPHeaders",
+            {"headers": {"Referer": referer}}
+        )
+
+    def _load_page_with_retry(
+        self,
+        url: str,
+        wait_locator: tuple,
+        page_name: str,
+        wait_seconds: int,
+        render_delay: int,
+        referer: str = None,
+    ) -> str:
+        """
+        페이지 로딩 + 대기 + 재시도를 공통 처리
+
+        Args:
+            url: 접속할 URL
+            wait_locator: 로딩 완료 판단용 locator
+            page_name: 로깅용 페이지 이름
+            wait_seconds: WebDriverWait 초
+            render_delay: 렌더링 추가 대기
+            referer: 선택적 referer 헤더
+
+        Returns:
+            str: 최종 HTML 소스
+
+        Raises:
+            Exception: 모든 재시도 실패 시 마지막 예외 재전파
+        """
+        last_error = None
+
+        for attempt in range(1, self.config.RETRY_ATTEMPTS + 1):
+            try:
+                if referer:
+                    self._set_referer(referer)
+
+                self.driver.get(url)
+                WebDriverWait(self.driver, wait_seconds).until(
+                    EC.presence_of_element_located(wait_locator)
+                )
+
+                time.sleep(render_delay)
+                self.consecutive_failures = 0
+                return self.driver.page_source
+
+            except Exception as e:
+                last_error = e
+                self.consecutive_failures += 1
+                logger.warning(
+                    f"{page_name} 로딩 실패 (시도 {attempt}/{self.config.RETRY_ATTEMPTS}): {url} - {e}"
+                )
+
+                if attempt < self.config.RETRY_ATTEMPTS:
+                    backoff = (2 ** (attempt - 1)) + random.uniform(0, 1)
+                    logger.info(f"{page_name} 재시도 전 {backoff:.1f}초 대기")
+                    time.sleep(backoff)
+
+        if self.consecutive_failures >= self.max_failures:
+            self._apply_cooldown()
+
+        raise last_error
+
+    def iter_list_pages(self, keyword: str = None):
+        """
+        목록 페이지를 순차적으로 yield하는 제너레이터
+
+        Args:
+            keyword: 검색 키워드 (None이면 config.SEARCH_KEYWORD 사용)
+
+        Yields:
+            tuple[int, str]: (페이지 번호, HTML 소스)
+        """
+        if keyword is None:
+            keyword = self.config.SEARCH_KEYWORD
+
+        encoded_keyword = quote(keyword)
+        logger.info(f"목록 크롤링 시작 - 키워드: {keyword}, 최대 페이지: {self.config.MAX_PAGES}")
+
+        for page in range(1, self.config.MAX_PAGES + 1):
+            url = BASE_URL.format(keyword=encoded_keyword, page=page)
+            referer = None
+
+            if page > 1:
+                referer = BASE_URL.format(keyword=encoded_keyword, page=page - 1)
+
+            logger.info(f"페이지 {page}/{self.config.MAX_PAGES} 접속 중...")
+
+            try:
+                html = self._load_page_with_retry(
+                    url=url,
+                    wait_locator=(By.CSS_SELECTOR, '[data-sentry-component="CardJob"]'),
+                    page_name="목록 페이지",
+                    wait_seconds=15,
+                    render_delay=2,
+                    referer=referer,
+                )
+            except Exception as e:
+                logger.error(f"목록 페이지 크롤링 중단: {url} - {e}")
+                break
+
+            yield page, html
+
+            if page < self.config.MAX_PAGES:
+                self._random_delay()
+
     def crawl_list_pages(self, keyword: str = None) -> list[str]:
         """
         Phase 1: 검색 결과 목록 페이지 크롤링
@@ -107,99 +216,76 @@ class JobKoreaCrawler:
         Returns:
             list[str]: 각 페이지의 HTML 소스 리스트
         """
-        if keyword is None:
-            keyword = self.config.SEARCH_KEYWORD
-
-        html_pages = []
-        encoded_keyword = quote(keyword)
-
-        logger.info(f"목록 크롤링 시작 - 키워드: {keyword}, 최대 페이지: {self.config.MAX_PAGES}")
-
-        try:
-            for page in range(1, self.config.MAX_PAGES + 1):
-                url = BASE_URL.format(keyword=encoded_keyword, page=page)
-                logger.info(f"페이지 {page}/{self.config.MAX_PAGES} 접속 중...")
-
-                # Referer 설정 (봇 우회 보완)
-                if page > 1:
-                    prev_url = BASE_URL.format(keyword=encoded_keyword, page=page - 1)
-                    self.driver.execute_cdp_cmd(
-                        "Network.setExtraHTTPHeaders",
-                        {"headers": {"Referer": prev_url}}
-                    )
-
-                self.driver.get(url)
-
-                # 카드가 로딩될 때까지 대기
-                try:
-                    WebDriverWait(self.driver, 15).until(
-                        EC.presence_of_element_located(
-                            (By.CSS_SELECTOR, '[data-sentry-component="CardJob"]')
-                        )
-                    )
-                    logger.debug(f"페이지 {page} 로딩 완료")
-                    self.consecutive_failures = 0
-                except Exception:
-                    self.consecutive_failures += 1
-                    logger.warning(f"페이지 {page} 로딩 타임아웃 (연속 실패: {self.consecutive_failures})")
-
-                    if self.consecutive_failures >= self.max_failures:
-                        self._apply_cooldown()
-                    break
-
-                time.sleep(2)  # 동적 렌더링 완료 대기
-                html_pages.append(self.driver.page_source)
-
-                # 다음 페이지 전 랜덤 딜레이
-                if page < self.config.MAX_PAGES:
-                    self._random_delay()
-
-        except Exception as e:
-            logger.error(f"목록 크롤링 중 에러: {e}", exc_info=True)
+        html_pages = [html for _, html in self.iter_list_pages(keyword)]
 
         logger.info(f"목록 크롤링 완료 - 수집된 페이지: {len(html_pages)}")
         return html_pages
 
     def crawl_detail_page(self, url: str) -> str:
         """
-        Phase 2: 상세 페이지 크롤링
+        하위 호환성을 위한 회사 페이지 크롤링 래퍼
 
         Args:
-            url: 상세 페이지 URL
+            url: 회사 페이지 URL
+
+        Returns:
+            str: 페이지의 HTML 소스
+        """
+        return self.crawl_company_page(url)
+
+    def crawl_job_detail_page(self, url: str) -> str:
+        """
+        Phase 2: JD 상세 페이지 크롤링
+
+        Args:
+            url: JD 상세 페이지 URL
 
         Returns:
             str: 페이지의 HTML 소스
         """
         try:
-            # Referer 설정 (목록 페이지에서 온 것처럼)
-            self.driver.execute_cdp_cmd(
-                "Network.setExtraHTTPHeaders",
-                {"headers": {"Referer": "https://www.jobkorea.co.kr/Search/"}}
+            return self._load_page_with_retry(
+                url=url,
+                wait_locator=(
+                    By.CSS_SELECTOR,
+                    '[data-sentry-component="CompanyName"], #details-section, #company-section',
+                ),
+                page_name="JD 상세 페이지",
+                wait_seconds=15,
+                render_delay=1,
+                referer="https://www.jobkorea.co.kr/Search/",
             )
 
-            self.driver.get(url)
+        except Exception as e:
+            logger.error(f"JD 상세 페이지 크롤링 에러: {url} - {e}")
+            return ""
 
-            # 기업 정보 섹션 로딩 대기
-            try:
-                WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located(
-                        (By.CSS_SELECTOR, '[class*="inner-wrap"], [class*="company-info"]')
-                    )
-                )
-                self.consecutive_failures = 0
-            except Exception:
-                self.consecutive_failures += 1
-                logger.warning(f"상세 페이지 로딩 타임아웃: {url}")
+    def crawl_company_page(self, url: str, referer: str = None) -> str:
+        """
+        Phase 2: 회사 상세 페이지 크롤링
 
-                if self.consecutive_failures >= self.max_failures:
-                    self._apply_cooldown()
+        Args:
+            url: 회사 페이지 URL
+            referer: 선택적 referer URL
 
-            time.sleep(1)  # 동적 렌더링 완료 대기
-            return self.driver.page_source
+        Returns:
+            str: 페이지의 HTML 소스
+        """
+        try:
+            return self._load_page_with_retry(
+                url=url,
+                wait_locator=(
+                    By.CSS_SELECTOR,
+                    '.company-infomation-row.basic-infomation, table.table-basic-infomation-primary',
+                ),
+                page_name="회사 페이지",
+                wait_seconds=10,
+                render_delay=1,
+                referer=referer or "https://www.jobkorea.co.kr/Search/",
+            )
 
         except Exception as e:
-            self.consecutive_failures += 1
-            logger.error(f"상세 페이지 크롤링 에러: {url} - {e}")
+            logger.error(f"회사 페이지 크롤링 에러: {url} - {e}")
             return ""
 
 

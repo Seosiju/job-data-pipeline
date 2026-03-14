@@ -96,4 +96,4 @@ jobkorea/
 
 ## 관련 문서
 
-- 본 기획: [system_architecture.md](./system_architecture.md)
+- 본 기획: [system_architecture.md](../architecture/system_architecture.md)
