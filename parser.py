@@ -32,7 +32,11 @@ COMPANY_INFO_TABLE_SELECTOR = 'table.table-basic-infomation-primary'
 COMPANY_INFO_ROW_SELECTOR = 'tr.field'
 COMPANY_INFO_LABEL_SELECTOR = 'th.field-label'
 COMPANY_INFO_VALUE_SELECTOR = 'td.field-value'
-COMPANY_HEADER_HOMEPAGE_SELECTOR = '.company-header .add-ons .home a.button-home'
+COMPANY_HEADER_HOMEPAGE_SELECTOR = (
+    '.company-header .add-ons .home a.button-home, '
+    '.company-header-branding .add-ons .home a.button-home'
+)
+SUPER_COMPANY_INFO_SELECTOR = '.corpInfo'
 
 
 def parse_job_cards(html_source):
@@ -310,6 +314,7 @@ def _is_company_page(soup) -> bool:
             soup.select_one(COMPANY_INFO_SECTION_SELECTOR),
             soup.select_one(COMPANY_INFO_TABLE_SELECTOR),
             soup.select_one(COMPANY_HEADER_HOMEPAGE_SELECTOR),
+            soup.select_one(SUPER_COMPANY_INFO_SELECTOR),
         )
     )
 
@@ -322,11 +327,59 @@ def _parse_from_company_page_structure(soup) -> dict:
     if table is not None:
         for label, value, element in _iter_label_value_pairs(table):
             _extract_field_from_label_value(label, value, element, details)
+    else:
+        details = _parse_from_super_company_structure(soup)
 
     if not details["homepage_url"]:
         details["homepage_url"] = _extract_company_homepage_from_header(soup)
 
     return details
+
+
+def _parse_from_super_company_structure(soup) -> dict:
+    """슈퍼기업관 레이아웃의 corpInfo 블록을 파싱한다."""
+    details = _init_company_details()
+    corp_info = soup.select_one(SUPER_COMPANY_INFO_SELECTOR)
+    if corp_info is None:
+        return details
+
+    for item in corp_info.select("li"):
+        texts = [p.get_text(" ", strip=True) for p in item.select("p") if p.get_text(" ", strip=True)]
+        if len(texts) < 2:
+            continue
+
+        label, value = _normalize_super_company_item(texts)
+        if label and value:
+            _extract_field_from_label_value(label, value, item, details)
+
+    if not details["homepage_url"]:
+        details["homepage_url"] = _extract_company_homepage_from_header(soup)
+
+    return details
+
+
+def _normalize_super_company_item(texts: list[str]) -> tuple[str | None, str | None]:
+    """슈퍼기업관 corpInfo item을 label/value 쌍으로 정규화한다."""
+    last_text = texts[-1]
+    first_text = texts[0]
+
+    if "사원수" in last_text:
+        return "사원수", first_text
+
+    if "기업형태" in last_text or "기업규모" in last_text:
+        return "기업형태", first_text
+
+    if "설립" in last_text:
+        return "설립", last_text
+
+    if any("설립" in text for text in texts):
+        establishment_text = next(text for text in texts if "설립" in text)
+        return "설립", establishment_text
+
+    if "홈페이지" in last_text:
+        return "홈페이지", first_text
+
+    return None, None
 
 
 def _find_primary_company_info_table(soup):

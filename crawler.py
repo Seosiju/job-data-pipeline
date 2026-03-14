@@ -5,6 +5,8 @@ crawler.py - Selenium 기반 잡코리아 크롤러
 import time
 import random
 import logging
+from datetime import datetime
+from pathlib import Path
 from urllib.parse import quote
 
 from selenium import webdriver
@@ -104,6 +106,74 @@ class JobKoreaCrawler:
             {"headers": {"Referer": referer}}
         )
 
+    def _get_diagnostic_dir(self) -> Path:
+        """페이지 실패 진단 산출물 저장 디렉터리 반환"""
+        diagnostic_dir = Path(__file__).resolve().parent / self.config.LOG_DIR / "page_diagnostics"
+        diagnostic_dir.mkdir(parents=True, exist_ok=True)
+        return diagnostic_dir
+
+    def _safe_driver_attr(self, attr_name: str, default: str = "") -> str:
+        """드라이버 속성 접근을 안전하게 감싼다."""
+        try:
+            value = getattr(self.driver, attr_name)
+            return value or default
+        except Exception:
+            return default
+
+    def _safe_page_source(self) -> str:
+        """page_source 접근을 안전하게 감싼다."""
+        return self._safe_driver_attr("page_source", "")
+
+    def _capture_failure_diagnostics(self, page_name: str, requested_url: str, error: Exception) -> Path | None:
+        """실패 시점의 최종 URL/제목/HTML을 저장한다."""
+        if not self.driver:
+            return None
+
+        safe_page_name = "".join(
+            char if char.isalnum() else "_"
+            for char in page_name.lower()
+        ).strip("_") or "page"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_name = f"{timestamp}_{safe_page_name}"
+        diagnostic_dir = self._get_diagnostic_dir()
+
+        current_url = self._safe_driver_attr("current_url")
+        title = self._safe_driver_attr("title")
+        page_source = self._safe_page_source()
+
+        html_path = diagnostic_dir / f"{base_name}.html"
+        meta_path = diagnostic_dir / f"{base_name}.txt"
+
+        try:
+            html_path.write_text(page_source, encoding="utf-8")
+        except Exception as write_error:
+            logger.warning("진단용 HTML 저장 실패: %s", write_error)
+            html_path = None
+
+        try:
+            meta_lines = [
+                f"page_name: {page_name}",
+                f"requested_url: {requested_url}",
+                f"current_url: {current_url}",
+                f"title: {title}",
+                f"error: {error}",
+            ]
+            meta_path.write_text("\n".join(meta_lines) + "\n", encoding="utf-8")
+        except Exception as write_error:
+            logger.warning("진단용 메타데이터 저장 실패: %s", write_error)
+
+        logger.error(
+            "%s 진단 정보 - requested_url=%s current_url=%s title=%s html=%s meta=%s",
+            page_name,
+            requested_url,
+            current_url or "<empty>",
+            title or "<empty>",
+            str(html_path) if html_path else "<not-saved>",
+            str(meta_path),
+        )
+
+        return html_path
+
     def _load_page_with_retry(
         self,
         url: str,
@@ -161,6 +231,7 @@ class JobKoreaCrawler:
         if self.consecutive_failures >= self.max_failures:
             self._apply_cooldown()
 
+        self._capture_failure_diagnostics(page_name, url, last_error)
         raise last_error
 
     def iter_list_pages(self, keyword: str = None):
@@ -276,7 +347,10 @@ class JobKoreaCrawler:
                 url=url,
                 wait_locator=(
                     By.CSS_SELECTOR,
-                    '.company-infomation-row.basic-infomation, table.table-basic-infomation-primary',
+                    '.company-infomation-row.basic-infomation, '
+                    'table.table-basic-infomation-primary, '
+                    '.corpInfo, '
+                    '.company-header .add-ons .home a.button-home',
                 ),
                 page_name="회사 페이지",
                 wait_seconds=10,

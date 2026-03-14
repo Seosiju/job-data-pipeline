@@ -195,6 +195,43 @@ class TestParseCompanyDetail:
         assert details["establishment_year"] == "2021"
         assert details["homepage_url"] == "https://zippoom.com/"
 
+    def test_parse_super_company_page_structure(self):
+        """슈퍼기업관 레이아웃에서도 핵심 상세 필드를 파싱해야 한다"""
+        html = """
+        <article class="starHead company-header-container">
+            <div class="company-header">
+                <div class="add-ons">
+                    <div class="home">
+                        <a class="button-home" href="http://neonutra.com/">홈페이지</a>
+                    </div>
+                </div>
+            </div>
+        </article>
+        <div class="corpInfo">
+            <ul>
+                <li class="icnCorp01">
+                    <p>설립 17년차</p>
+                    <p>2005년도 설립</p>
+                </li>
+                <li class="icnCorp02">
+                    <p>53명</p>
+                    <p>사원수</p>
+                </li>
+                <li class="icnCorp03">
+                    <p>중소기업</p>
+                    <p>기업형태</p>
+                </li>
+            </ul>
+        </div>
+        """
+
+        details = parse_company_detail(html)
+
+        assert details["company_size"] == "중소기업"
+        assert details["employee_count"] == "53명"
+        assert details["establishment_year"] == "2005"
+        assert details["homepage_url"] == "http://neonutra.com/"
+
     def test_parse_company_detail_returns_empty_for_jd_fixture(self, jd_detail_html):
         """JD 상세 HTML은 회사 페이지 파서가 비워서 반환해야 한다"""
         details = parse_company_detail(jd_detail_html)
