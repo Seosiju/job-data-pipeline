@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -41,6 +42,7 @@ class JobKoreaCrawler:
         self.driver = None
         self.consecutive_failures = 0
         self.max_failures = 5
+        self.last_page_diagnostics: dict[str, str | bool | None] | None = None
 
     def __enter__(self):
         """Context Manager 진입: 드라이버 생성"""
@@ -124,7 +126,47 @@ class JobKoreaCrawler:
         """page_source 접근을 안전하게 감싼다."""
         return self._safe_driver_attr("page_source", "")
 
-    def _capture_failure_diagnostics(self, page_name: str, requested_url: str, error: Exception) -> Path | None:
+    def _format_wait_locator(self, wait_locator: tuple | None) -> str | None:
+        """대기 selector를 사람이 읽을 수 있는 문자열로 변환한다."""
+        if not wait_locator:
+            return None
+        return f"{wait_locator[0]}: {wait_locator[1]}"
+
+    def _build_page_diagnostics(
+        self,
+        page_name: str,
+        requested_url: str,
+        wait_locator: tuple | None = None,
+        error: Exception | None = None,
+        html_path: Path | None = None,
+        meta_path: Path | None = None,
+    ) -> dict[str, str | bool | None]:
+        """현재 브라우저 상태를 구조화된 진단 정보로 정리한다."""
+        return {
+            "page_name": page_name,
+            "requested_url": requested_url,
+            "final_url": self._safe_driver_attr("current_url") or None,
+            "title": self._safe_driver_attr("title") or None,
+            "wait_locator": self._format_wait_locator(wait_locator),
+            "wait_timed_out": isinstance(error, TimeoutException),
+            "error": str(error) if error else None,
+            "html_path": str(html_path) if html_path else None,
+            "meta_path": str(meta_path) if meta_path else None,
+        }
+
+    def get_last_page_diagnostics(self) -> dict[str, str | bool | None] | None:
+        """최근 페이지 로딩의 진단 정보 사본 반환"""
+        if self.last_page_diagnostics is None:
+            return None
+        return dict(self.last_page_diagnostics)
+
+    def _capture_failure_diagnostics(
+        self,
+        page_name: str,
+        requested_url: str,
+        error: Exception,
+        wait_locator: tuple | None = None,
+    ) -> dict[str, str | bool | None] | None:
         """실패 시점의 최종 URL/제목/HTML을 저장한다."""
         if not self.driver:
             return None
@@ -137,8 +179,6 @@ class JobKoreaCrawler:
         base_name = f"{timestamp}_{safe_page_name}"
         diagnostic_dir = self._get_diagnostic_dir()
 
-        current_url = self._safe_driver_attr("current_url")
-        title = self._safe_driver_attr("title")
         page_source = self._safe_page_source()
 
         html_path = diagnostic_dir / f"{base_name}.html"
@@ -150,29 +190,43 @@ class JobKoreaCrawler:
             logger.warning("진단용 HTML 저장 실패: %s", write_error)
             html_path = None
 
+        diagnostics = self._build_page_diagnostics(
+            page_name=page_name,
+            requested_url=requested_url,
+            wait_locator=wait_locator,
+            error=error,
+            html_path=html_path,
+            meta_path=meta_path,
+        )
+
         try:
             meta_lines = [
                 f"page_name: {page_name}",
-                f"requested_url: {requested_url}",
-                f"current_url: {current_url}",
-                f"title: {title}",
+                f"requested_url: {diagnostics['requested_url']}",
+                f"current_url: {diagnostics['final_url'] or ''}",
+                f"title: {diagnostics['title'] or ''}",
+                f"wait_locator: {diagnostics['wait_locator'] or ''}",
+                f"wait_timed_out: {diagnostics['wait_timed_out']}",
                 f"error: {error}",
             ]
             meta_path.write_text("\n".join(meta_lines) + "\n", encoding="utf-8")
         except Exception as write_error:
             logger.warning("진단용 메타데이터 저장 실패: %s", write_error)
 
+        self.last_page_diagnostics = diagnostics
         logger.error(
-            "%s 진단 정보 - requested_url=%s current_url=%s title=%s html=%s meta=%s",
+            "%s 진단 정보 - requested_url=%s current_url=%s title=%s wait_locator=%s wait_timed_out=%s html=%s meta=%s",
             page_name,
             requested_url,
-            current_url or "<empty>",
-            title or "<empty>",
+            diagnostics["final_url"] or "<empty>",
+            diagnostics["title"] or "<empty>",
+            diagnostics["wait_locator"] or "<empty>",
+            diagnostics["wait_timed_out"],
             str(html_path) if html_path else "<not-saved>",
             str(meta_path),
         )
 
-        return html_path
+        return diagnostics
 
     def _load_page_with_retry(
         self,
@@ -201,6 +255,7 @@ class JobKoreaCrawler:
             Exception: 모든 재시도 실패 시 마지막 예외 재전파
         """
         last_error = None
+        self.last_page_diagnostics = None
 
         for attempt in range(1, self.config.RETRY_ATTEMPTS + 1):
             try:
@@ -214,6 +269,11 @@ class JobKoreaCrawler:
 
                 time.sleep(render_delay)
                 self.consecutive_failures = 0
+                self.last_page_diagnostics = self._build_page_diagnostics(
+                    page_name=page_name,
+                    requested_url=url,
+                    wait_locator=wait_locator,
+                )
                 return self.driver.page_source
 
             except Exception as e:
@@ -231,7 +291,7 @@ class JobKoreaCrawler:
         if self.consecutive_failures >= self.max_failures:
             self._apply_cooldown()
 
-        self._capture_failure_diagnostics(page_name, url, last_error)
+        self._capture_failure_diagnostics(page_name, url, last_error, wait_locator=wait_locator)
         raise last_error
 
     def iter_list_pages(self, keyword: str = None):

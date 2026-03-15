@@ -41,8 +41,23 @@ class TestPhase2SmokeTestScript:
     def test_main_runs_limited_smoke_test(self, monkeypatch):
         before_after_calls = []
         run_calls = {}
+        candidate_calls = []
 
         monkeypatch.setattr(smoke_module, "DatabaseManager", FakeSmokeDB)
+        monkeypatch.setattr(
+            smoke_module,
+            "get_smoke_test_candidates",
+            lambda db, limit, company_id=None: candidate_calls.append(
+                {"limit": limit, "company_id": company_id}
+            ) or [
+                {
+                    "id": 1,
+                    "name": "스모크회사A",
+                    "company_page_url": None,
+                    "detail_url": "https://www.jobkorea.co.kr/Recruit/GI_Read/1",
+                }
+            ],
+        )
         monkeypatch.setattr(
             smoke_module,
             "get_company_snapshots",
@@ -70,9 +85,27 @@ class TestPhase2SmokeTestScript:
 
         db = FakeSmokeDB.last_instance
         assert exit_code == 0
-        assert db.limit_calls == [1]
+        assert db.limit_calls == []
+        assert candidate_calls == [{"limit": 1, "company_id": None}]
         assert before_after_calls == [[1], [1]]
         assert run_calls == {"headless": True, "company_ids": [1]}
+
+    def test_main_passes_company_id_to_candidate_selector(self, monkeypatch):
+        candidate_calls = []
+
+        monkeypatch.setattr(smoke_module, "DatabaseManager", FakeSmokeDB)
+        monkeypatch.setattr(
+            smoke_module,
+            "get_smoke_test_candidates",
+            lambda db, limit, company_id=None: candidate_calls.append(
+                {"limit": limit, "company_id": company_id}
+            ) or [],
+        )
+
+        exit_code = smoke_module.main(["--limit", "1", "--company-id", "58"])
+
+        assert exit_code == 1
+        assert candidate_calls == [{"limit": 1, "company_id": 58}]
 
     def test_main_rejects_non_positive_limit(self):
         exit_code = smoke_module.main(["--limit", "0"])

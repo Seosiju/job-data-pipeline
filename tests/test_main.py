@@ -91,6 +91,7 @@ class FakePhase2Crawler:
         self.job_detail_calls = []
         self.company_page_calls = []
         self.random_delay_calls = 0
+        self.last_page_diagnostics = None
         self.__class__.instances.append(self)
 
     def __enter__(self):
@@ -101,14 +102,35 @@ class FakePhase2Crawler:
 
     def crawl_job_detail_page(self, url):
         self.job_detail_calls.append(url)
+        self.last_page_diagnostics = {
+            "final_url": url,
+            "title": "JD 상세",
+            "wait_locator": "css selector: [data-sentry-component=\"CompanyName\"]",
+            "wait_timed_out": False,
+            "error": None,
+            "html_path": None,
+            "meta_path": None,
+        }
         return f"<job-detail url='{url}'>"
 
     def crawl_company_page(self, url, referer=None):
         self.company_page_calls.append((url, referer))
+        self.last_page_diagnostics = {
+            "final_url": url,
+            "title": "회사 페이지",
+            "wait_locator": "css selector: .company-infomation-row.basic-infomation",
+            "wait_timed_out": False,
+            "error": None,
+            "html_path": None,
+            "meta_path": None,
+        }
         return f"<company-page url='{url}'>"
 
     def _random_delay(self):
         self.random_delay_calls += 1
+
+    def get_last_page_diagnostics(self):
+        return dict(self.last_page_diagnostics) if self.last_page_diagnostics else None
 
 
 class FakePhase2DB:
@@ -320,6 +342,66 @@ class TestRunPhase2:
         ]
         assert parse_calls["company_page_url"] == 0
         assert db.saved_company_page_urls == []
+
+    def test_run_phase2_for_companies_records_redirected_company_page_diagnostics(self, monkeypatch):
+        """회사 페이지 결과에는 최종 URL/title 같은 진단 정보가 포함돼야 한다"""
+        db = FakePhase2DB(
+            [
+                {
+                    "id": 58,
+                    "name": "네오뉴트라",
+                    "company_page_url": "https://www.jobkorea.co.kr/Recruit/Co_Read/C/280272",
+                    "detail_url": "https://www.jobkorea.co.kr/Recruit/GI_Read/48755288",
+                }
+            ]
+        )
+
+        class RedirectingCompanyPageCrawler(FakePhase2Crawler):
+            def crawl_company_page(self, url, referer=None):
+                self.company_page_calls.append((url, referer))
+                self.last_page_diagnostics = {
+                    "final_url": "https://www.jobkorea.co.kr/Super/neonutra",
+                    "title": "네오뉴트라 슈퍼기업관 - 일하기 좋은 우수 기업 | 잡코리아",
+                    "wait_locator": "css selector: .corpInfo",
+                    "wait_timed_out": False,
+                    "error": None,
+                    "html_path": None,
+                    "meta_path": None,
+                }
+                return "<company-page url='https://www.jobkorea.co.kr/Super/neonutra'>"
+
+        monkeypatch.setattr(main_module, "JobKoreaCrawler", RedirectingCompanyPageCrawler)
+        monkeypatch.setattr(
+            main_module,
+            "parse_company_detail",
+            lambda html: {
+                "company_size": "중소기업",
+                "employee_count": "53명",
+                "establishment_year": "2005",
+                "homepage_url": "http://www.neonutra.com",
+            },
+        )
+        monkeypatch.setattr(main_module, "validate_company_details", lambda details: details)
+
+        results = main_module.run_phase2_for_companies(
+            object(),
+            db,
+            [
+                {
+                    "id": 58,
+                    "name": "네오뉴트라",
+                    "company_page_url": "https://www.jobkorea.co.kr/Recruit/Co_Read/C/280272",
+                    "detail_url": "https://www.jobkorea.co.kr/Recruit/GI_Read/48755288",
+                }
+            ],
+        )
+
+        result = results[0]
+        assert result["status"] == "updated"
+        assert result["company_page_final_url"] == "https://www.jobkorea.co.kr/Super/neonutra"
+        assert result["company_page_title"] == "네오뉴트라 슈퍼기업관 - 일하기 좋은 우수 기업 | 잡코리아"
+        assert result["company_page_wait_timed_out"] is False
+        assert result["company_page_wait_locator"] == "css selector: .corpInfo"
 
     def test_run_phase2_uses_explicit_companies_without_db_lookup(self, monkeypatch):
         """명시된 company list가 있으면 DB 대상 조회 없이 처리해야 한다"""

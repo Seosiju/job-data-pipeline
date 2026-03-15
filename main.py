@@ -96,6 +96,18 @@ def _resolve_phase2_company_page_url(
     return company_page_url, job_detail_url
 
 
+def _attach_company_page_diagnostics(result: dict, crawler: JobKoreaCrawler) -> None:
+    """최근 회사 페이지 로드 진단 정보를 result에 복사한다."""
+    diagnostics = crawler.get_last_page_diagnostics() or {}
+    result["company_page_final_url"] = diagnostics.get("final_url")
+    result["company_page_title"] = diagnostics.get("title")
+    result["company_page_wait_locator"] = diagnostics.get("wait_locator")
+    result["company_page_wait_timed_out"] = diagnostics.get("wait_timed_out")
+    result["company_page_error"] = diagnostics.get("error")
+    result["company_page_diagnostic_html_path"] = diagnostics.get("html_path")
+    result["company_page_diagnostic_meta_path"] = diagnostics.get("meta_path")
+
+
 def run_phase1_for_keyword(keyword: str, config: Config, db: DatabaseManager) -> dict:
     """
     Phase 1: 특정 키워드에 대한 목록 페이지 크롤링 및 DB 저장
@@ -279,6 +291,13 @@ def run_phase2_for_companies(
                 "status": "unknown",
                 "updated": False,
                 "details": None,
+                "company_page_final_url": None,
+                "company_page_title": None,
+                "company_page_wait_locator": None,
+                "company_page_wait_timed_out": None,
+                "company_page_error": None,
+                "company_page_diagnostic_html_path": None,
+                "company_page_diagnostic_meta_path": None,
             }
 
             try:
@@ -300,6 +319,17 @@ def run_phase2_for_companies(
                     company_page_url,
                     referer=job_detail_url,
                 )
+                _attach_company_page_diagnostics(result, crawler)
+                if (
+                    result["company_page_final_url"]
+                    and result["company_page_final_url"] != company_page_url
+                ):
+                    logger.info(
+                        "회사 페이지 리다이렉트 감지: requested=%s final=%s title=%s",
+                        company_page_url,
+                        result["company_page_final_url"],
+                        result["company_page_title"] or "<empty>",
+                    )
                 if not company_html:
                     logger.info(f"회사 페이지 로드 실패: {company_name}")
                     print("   회사 페이지 로드 실패")

@@ -44,7 +44,62 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="true",
         help="브라우저 headless 모드",
     )
+    parser.add_argument(
+        "--company-id",
+        type=int,
+        help="특정 회사 ID만 대상으로 강제 재현",
+    )
     return parser.parse_args(argv)
+
+
+def get_company_candidate_by_id(db: DatabaseManager, company_id: int) -> dict | None:
+    """특정 회사 ID의 Phase 2 실행용 후보 행을 조회한다."""
+    with db.engine.connect() as conn:
+        row = conn.execute(
+            text("""
+                SELECT
+                    c.id,
+                    c.name,
+                    c.company_page_url,
+                    latest_job.detail_url
+                FROM companies c
+                LEFT JOIN LATERAL (
+                    SELECT jp.detail_url
+                    FROM job_postings jp
+                    WHERE jp.company_id = c.id
+                      AND jp.detail_url IS NOT NULL
+                    ORDER BY COALESCE(jp.last_seen_at, jp.crawled_at) DESC NULLS LAST,
+                             jp.id DESC NULLS LAST
+                    LIMIT 1
+                ) latest_job ON TRUE
+                WHERE c.id = :company_id
+                LIMIT 1
+            """),
+            {"company_id": company_id},
+        ).mappings().first()
+
+    if row is None:
+        return None
+
+    candidate = dict(row)
+    if not candidate.get("company_page_url") and not candidate.get("detail_url"):
+        return None
+    return candidate
+
+
+def get_smoke_test_candidates(
+    db: DatabaseManager,
+    limit: int,
+    company_id: int | None = None,
+) -> list[dict]:
+    """smoke test 후보를 조회한다."""
+    if company_id is None:
+        return db.get_companies_without_details(limit=limit)
+
+    candidate = get_company_candidate_by_id(db, company_id)
+    if candidate is None:
+        return []
+    return [candidate]
 
 
 def get_company_snapshots(db: DatabaseManager, company_ids: list[int]) -> dict[int, dict]:
@@ -104,6 +159,19 @@ def print_results(before: dict[int, dict], after: dict[int, dict], results: list
             f"cached_after={'yes' if after_row.get('company_page_url') else 'no'} "
             f"details_after={'yes' if after_row.get('company_size') else 'no'}"
         )
+        if result.get("company_page_final_url"):
+            print(f"  final_url={result['company_page_final_url']}")
+        if result.get("company_page_title"):
+            print(f"  title={result['company_page_title']}")
+        if result.get("company_page_wait_timed_out") is not None:
+            print(
+                "  wait_timed_out="
+                + ("yes" if result["company_page_wait_timed_out"] else "no")
+            )
+        if result.get("company_page_diagnostic_html_path"):
+            print(f"  diagnostic_html={result['company_page_diagnostic_html_path']}")
+        if result.get("company_page_diagnostic_meta_path"):
+            print(f"  diagnostic_meta={result['company_page_diagnostic_meta_path']}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -118,8 +186,15 @@ def main(argv: list[str] | None = None) -> int:
     db = DatabaseManager(config)
     db.create_tables()
 
-    candidates = db.get_companies_without_details(limit=args.limit)
+    candidates = get_smoke_test_candidates(
+        db,
+        limit=args.limit,
+        company_id=args.company_id,
+    )
     if not candidates:
+        if args.company_id is not None:
+            print(f"회사 ID {args.company_id}에 대한 Phase 2 대상이 없습니다.")
+            return 1
         print("선택 가능한 Phase 2 대상이 없습니다.")
         return 0
 

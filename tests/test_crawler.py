@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from selenium.webdriver.common.by import By
+
 from crawler import JobKoreaCrawler
 
 
@@ -32,15 +34,21 @@ class TestCrawlerDiagnostics:
         crawler.config = type("Config", (), {"LOG_DIR": str(tmp_path)})()
         crawler.driver = FakeDriver()
 
-        html_path = crawler._capture_failure_diagnostics(
+        diagnostics = crawler._capture_failure_diagnostics(
             "회사 페이지",
             "https://www.jobkorea.co.kr/requested",
             RuntimeError("timeout"),
+            wait_locator=(By.CSS_SELECTOR, ".corpInfo"),
         )
 
-        assert html_path is not None
+        assert diagnostics is not None
+        html_path = Path(diagnostics["html_path"])
         assert html_path.exists()
         assert html_path.read_text(encoding="utf-8") == "<html><body>blocked</body></html>"
+        assert diagnostics["final_url"] == "https://www.jobkorea.co.kr/final"
+        assert diagnostics["title"] == "차단 또는 예외 페이지"
+        assert diagnostics["wait_locator"] == "css selector: .corpInfo"
+        assert diagnostics["wait_timed_out"] is False
 
         meta_path = Path(str(html_path).replace(".html", ".txt"))
         assert meta_path.exists()
@@ -48,6 +56,8 @@ class TestCrawlerDiagnostics:
         assert "requested_url: https://www.jobkorea.co.kr/requested" in meta_text
         assert "current_url: https://www.jobkorea.co.kr/final" in meta_text
         assert "title: 차단 또는 예외 페이지" in meta_text
+        assert "wait_locator: css selector: .corpInfo" in meta_text
+        assert "wait_timed_out: False" in meta_text
         assert "error: timeout" in meta_text
 
     def test_capture_failure_diagnostics_handles_page_source_failure(self, tmp_path):
@@ -55,12 +65,13 @@ class TestCrawlerDiagnostics:
         crawler.config = type("Config", (), {"LOG_DIR": str(tmp_path)})()
         crawler.driver = BrokenPageSourceDriver()
 
-        html_path = crawler._capture_failure_diagnostics(
+        diagnostics = crawler._capture_failure_diagnostics(
             "회사 페이지",
             "https://www.jobkorea.co.kr/requested",
             RuntimeError("timeout"),
         )
 
-        assert html_path is not None
+        assert diagnostics is not None
+        html_path = Path(diagnostics["html_path"])
         assert html_path.exists()
         assert html_path.read_text(encoding="utf-8") == ""

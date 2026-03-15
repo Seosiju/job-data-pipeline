@@ -28,7 +28,7 @@
 - Phase 2는 `company_page_url` 저장/재사용 경로까지 반영됐지만, 기존 데이터 중 URL이 비어 있는 회사는 첫 보강 시 한 번은 JD를 열어야 합니다.
 - 저장된 `company_page_url`가 실패할 때 JD로 재해결하는 fallback은 아직 없습니다.
 - JD/회사 페이지 selector 검증은 아직 소수 fixture 중심입니다.
-- 2026-03-15 live smoke test 기준, cached `company_page_url`가 있어도 일부 회사 페이지는 실제 로딩 단계에서 timeout이 재현됐습니다.
+- 2026-03-15 timeout diagnosis 기준, historical timeout artifact의 원인은 `Co_Read` 요청이 `Super` 회사 페이지로 리다이렉트되는 레이아웃 변형 경로였고, 현재 live rerun에서는 같은 URL이 정상 로드됐습니다.
 
 ## 2. 현재 구현 흐름
 
@@ -63,6 +63,7 @@ DatabaseManager.get_companies_without_details()
 - Phase 1 수집 정확성: 현재 fixture 기준 전역 `CardJob`는 `27`개, 메인 `JobList` 내부 카드는 `20`개입니다. live 구조가 크게 바뀌면 폴백 경로에서 다시 과수집될 수 있습니다.
 - Phase 2 시작 URL: 저장된 `companies.company_page_url`가 있으면 이를 우선 사용하고, 없을 때만 최신 `job_postings.detail_url`에서 출발합니다.
 - Phase 2 URL 캐시: 새로 찾은 회사 페이지 URL은 `companies.company_page_url`에 저장해 이후 실행에서 재사용합니다.
+- Phase 2 진단 정보: 회사 페이지 로더는 최근 요청의 `final_url`, `title`, `wait_locator`, timeout 여부, diagnostic HTML/meta 경로를 보관하고 smoke/test 경로에서 이를 출력할 수 있습니다.
 - 보조 분석 스크립트: `scripts/analyze_detail_page.py`는 `--mode jd|company`로 현재 흐름에 맞춰 JD 분석과 회사 페이지 분석을 분리합니다.
 
 실제 오케스트레이션은 `main.py`, 크롤링은 `crawler.py`, 파싱은 `parser.py`, 정제는 `validators.py`, DB 처리는 `database.py` 가 담당합니다.
@@ -242,7 +243,7 @@ CREATE TABLE IF NOT EXISTS job_posting_history (
 ## 8. 보조 스크립트
 
 - `scripts/analyze_detail_page.py`: `--mode jd|company`로 JD 상세 구조와 저장된 회사 페이지 구조를 각각 분석하는 보조 스크립트
-- `scripts/phase2_smoke_test.py`: Phase 2 대상 일부만 선택해 `company_page_url` 재사용과 회사 페이지 로딩을 live 기준으로 검증하는 스크립트
+- `scripts/phase2_smoke_test.py`: Phase 2 대상 일부만 선택해 `company_page_url` 재사용과 회사 페이지 로딩을 live 기준으로 검증하는 스크립트. `--company-id`로 특정 회사를 강제 재현할 수 있습니다.
 - `scripts/run_crawler.sh`: cron/systemd 등 스케줄러에서 `main.py` 실행
 - `scripts/manual_test_crawler.py`: 초기에 만든 수동 1페이지 CSV 점검 스크립트
 
@@ -273,6 +274,7 @@ CREATE TABLE IF NOT EXISTS job_posting_history (
 - `get_companies_without_details()`는 회사당 저장된 `company_page_url`와 최신 `detail_url` 1건을 함께 선택합니다.
 - 현재 `job_postings.detail_url`의 의미는 JD 상세 URL입니다.
 - 현재 Phase 2의 메인 경로는 `저장된 company_page_url 재사용 -> 회사 페이지 방문` 또는 `JD 상세 -> 회사 페이지 링크 추출/저장 -> 회사 페이지 방문`입니다.
+- `crawl_company_page()` 실패 시 `log/page_diagnostics/` 아래에 HTML/meta artifact를 남기고, 최근 결과는 `run_phase2_for_companies()`와 smoke script 출력에 전달됩니다.
 - 일정 기간 재발견되지 않은 공고는 `stale` 상태로 전환됩니다.
 
 현재 기준으로는 Phase 2 URL 재사용 경로의 live 검증, fixture 확대, fallback 보강 판단이 우선 작업입니다. 이 문서는 "구현되어 있는 경로"를 설명하며, 남은 한계는 위 제한사항을 따릅니다.

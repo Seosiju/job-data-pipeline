@@ -19,6 +19,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 SEARCH_RESULTS_FIXTURE = FIXTURES_DIR / "jobkorea_search_page_02.html"
 JD_DETAIL_FIXTURE = FIXTURES_DIR / "jobkorea_jd_detail_02.html"
 COMPANY_PAGE_FIXTURE = FIXTURES_DIR / "jobkorea_company_page_02.html"
+SUPER_COMPANY_PAGE_FIXTURE = FIXTURES_DIR / "jobkorea_company_page_super_neonutra_01.html"
 
 
 @pytest.fixture
@@ -37,6 +38,12 @@ def jd_detail_html():
 def company_page_html():
     """회사 페이지 fixture"""
     return COMPANY_PAGE_FIXTURE.read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def super_company_page_html():
+    """슈퍼기업관 회사 페이지 fixture"""
+    return SUPER_COMPANY_PAGE_FIXTURE.read_text(encoding="utf-8")
 
 
 @pytest.fixture
@@ -231,6 +238,15 @@ class TestParseCompanyDetail:
         assert details["employee_count"] == "53명"
         assert details["establishment_year"] == "2005"
         assert details["homepage_url"] == "http://neonutra.com/"
+
+    def test_parse_live_super_company_page_fixture(self, super_company_page_html):
+        """live redirect로 저장한 슈퍼기업관 fixture도 현재 파서가 처리해야 한다"""
+        details = parse_company_detail(super_company_page_html)
+
+        assert details["company_size"] == "중소기업"
+        assert details["employee_count"] == "53명"
+        assert details["establishment_year"] == "2005"
+        assert details["homepage_url"] == "http://www.neonutra.com"
 
     def test_parse_company_detail_returns_empty_for_jd_fixture(self, jd_detail_html):
         """JD 상세 HTML은 회사 페이지 파서가 비워서 반환해야 한다"""
