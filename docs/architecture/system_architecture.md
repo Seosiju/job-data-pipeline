@@ -26,6 +26,7 @@
 
 - Phase 1 검색 결과 파서는 `JobList` 우선 + 전역 `CardJob` 폴백 구조로 보정되었지만, 폴백 경로는 여전히 남아 있습니다.
 - Phase 2는 `company_page_url` 저장/재사용 경로까지 반영됐지만, 기존 데이터 중 URL이 비어 있는 회사는 첫 보강 시 한 번은 JD를 열어야 합니다.
+- 일부 회사는 저장된 `/Recruit/Co_Read/C/...` URL 요청 시 실제로 `Super/...` 회사 페이지로 리다이렉트될 수 있습니다. 현재 구현은 이를 파싱하고 진단 정보로 남길 수 있지만, 리다이렉트된 `final_url`을 `company_page_url`에 다시 저장하지는 않습니다.
 - 저장된 `company_page_url`가 실패할 때 JD로 재해결하는 fallback은 아직 없습니다.
 - JD/회사 페이지 selector 검증은 아직 소수 fixture 중심입니다.
 - 2026-03-15 timeout diagnosis 기준, historical timeout artifact의 원인은 `Co_Read` 요청이 `Super` 회사 페이지로 리다이렉트되는 레이아웃 변형 경로였고, 현재 live rerun에서는 같은 URL이 정상 로드됐습니다.
@@ -62,7 +63,7 @@ DatabaseManager.get_companies_without_details()
 - Phase 1 파서 스코프: `parse_job_cards()`는 `JobList` 컨테이너를 우선 사용하지만, 컨테이너를 찾지 못하면 전역 `CardJob`로 폴백합니다.
 - Phase 1 수집 정확성: 현재 fixture 기준 전역 `CardJob`는 `27`개, 메인 `JobList` 내부 카드는 `20`개입니다. live 구조가 크게 바뀌면 폴백 경로에서 다시 과수집될 수 있습니다.
 - Phase 2 시작 URL: 저장된 `companies.company_page_url`가 있으면 이를 우선 사용하고, 없을 때만 최신 `job_postings.detail_url`에서 출발합니다.
-- Phase 2 URL 캐시: 새로 찾은 회사 페이지 URL은 `companies.company_page_url`에 저장해 이후 실행에서 재사용합니다.
+- Phase 2 URL 캐시: JD에서 새로 찾은 회사 페이지 URL은 `companies.company_page_url`에 저장해 이후 실행에서 재사용합니다. 다만 현재는 회사 페이지 요청 중 관찰된 리다이렉트 `final_url`을 캐시로 재기록하지는 않습니다.
 - Phase 2 진단 정보: 회사 페이지 로더는 최근 요청의 `final_url`, `title`, `wait_locator`, timeout 여부, diagnostic HTML/meta 경로를 보관하고 smoke/test 경로에서 이를 출력할 수 있습니다.
 - 보조 분석 스크립트: `scripts/analyze_detail_page.py`는 `--mode jd|company`로 현재 흐름에 맞춰 JD 분석과 회사 페이지 분석을 분리합니다.
 

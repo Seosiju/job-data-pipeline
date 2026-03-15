@@ -85,6 +85,7 @@ docs/
 | 문서 | 설명 |
 |------|------|
 | [data_pipeline_service_roadmap.md](plans/data_pipeline_service_roadmap.md) | 현재 active plan인 중장기 데이터 파이프라인 + 서비스 확장 로드맵 |
+| [phase2_live_timeout_diagnosis_plan.md](plans/phase2_live_timeout_diagnosis_plan.md) | 회사 페이지 live timeout 원인 분리와 fixture/회귀 테스트 보강을 위한 단기 실행 계획 |
 
 **새 문서 예시**: `phase3_plan.md`, `docker_migration_plan.md`
 
@@ -149,9 +150,10 @@ docs/
 3. `plans/data_pipeline_service_roadmap.md`
 4. `status/current_status.md`
 5. `status/session_handoff.md`
-6. `reports/phase2_company_page_fix_review.md`
-7. `reports/phase2_followup_stabilization_report.md`
-8. `archive/`는 필요할 때만
+6. `plans/phase2_live_timeout_diagnosis_plan.md`
+7. `reports/phase2_company_page_fix_review.md`
+8. `reports/phase2_followup_stabilization_report.md`
+9. `archive/`는 필요할 때만
 
 ---
 

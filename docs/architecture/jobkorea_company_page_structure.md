@@ -1,7 +1,7 @@
 # JobKorea 회사 페이지 파싱 구조
 
-> 기준 샘플: `tests/fixtures/jobkorea_company_page_02.html`
-> 페이지 유형: 회사 상세 페이지 (`/Recruit/Co_Read/C/<company_id>`)
+> 기준 샘플: `tests/fixtures/jobkorea_company_page_02.html`, `tests/fixtures/jobkorea_company_page_super_neonutra_01.html`
+> 페이지 유형: 회사 상세 페이지 (`/Recruit/Co_Read/C/<company_id>`, `Super/<slug>`)
 > 목적: 회사 페이지 HTML에서 `companies` 보강 필드를 안정적으로 추출하기 위한 파서 명세
 
 ## 1. 문서 목적
@@ -25,10 +25,11 @@
 
 ## 2. 샘플 범위와 주의점
 
-- 본 문서는 현재 워킹트리에서 확인 가능한 실샘플 `jobkorea_company_page_02.html` 기준으로 작성했다.
+- 본 문서는 현재 워킹트리에서 확인 가능한 실샘플 `jobkorea_company_page_02.html`, `jobkorea_company_page_super_neonutra_01.html` 기준으로 작성했다.
 - 이 샘플은 브라우저 저장본이라 로컬 상대경로, 스크립트, 광고 코드가 많다.
-- 하지만 메인 데이터 영역은 서버 렌더링된 고전적인 HTML 테이블 구조라 파싱 난이도는 낮은 편이다.
-- 현재 기준 샘플 수는 1개이므로, 후속 샘플이 추가되면 필드명 변형 여부를 꼭 검증해야 한다.
+- 기본 회사 페이지는 서버 렌더링된 고전적인 HTML 테이블 구조라 파싱 난이도는 낮은 편이다.
+- 다만 live에서는 `Co_Read` 요청이 `Super` 회사 페이지로 리다이렉트되는 변형이 실제로 관찰됐다.
+- 현재 기준 샘플 수는 classic 1개 + super 1개이므로, 후속 샘플이 추가되면 필드명/레이아웃 변형 여부를 계속 검증해야 한다.
 
 ## 3. 페이지 정체성
 
@@ -52,7 +53,8 @@ https://www.jobkorea.co.kr/Recruit/Co_Read/C/nextground/Company_name/%E3%88%9C%E
 
 - JD에서 따라오는 링크와 페이지 내부 navigation/script 값은 숫자형 접근 URL을 주로 사용한다.
 - `canonical`, `og:url` 등 메타에는 slug 기반 URL 변형이 함께 존재할 수 있다.
-- 파서는 두 형식을 같은 회사 페이지로 인식할 수 있어야 한다.
+- live에서는 `/Recruit/Co_Read/C/...` 요청이 `https://www.jobkorea.co.kr/Super/<slug>`로 리다이렉트되는 경우가 있다.
+- 파서는 이 세 형식을 같은 회사 페이지 계열로 인식할 수 있어야 한다.
 
 ### 구조적 특징
 
@@ -134,6 +136,22 @@ table.table-basic-infomation-primary
 - `company_name` fallback
 - `industry` fallback
 - `homepage_url` fallback
+
+### 4.5 Super 회사 페이지 랜드마크
+
+```css
+.corpInfo
+```
+
+관찰 사실:
+
+- `Super` 회사 페이지에서는 classic `table.table-basic-infomation-primary` 대신 `.corpInfo` 리스트가 핵심 정보 블록으로 등장할 수 있다.
+- `사원수`, `기업형태`, `설립`, `홈페이지` 계열 정보가 `li > p` 조합으로 표현된다.
+
+파서 활용:
+
+- classic 테이블이 없을 때 `Super` 회사 페이지 fallback의 primary selector로 사용
+- current parser도 이 경로를 실제 지원한다
 
 ## 5. 실제 확인된 필드
 
@@ -310,6 +328,7 @@ def normalize_company_fact(label: str, value: str) -> tuple[str | None, str | No
 - `.company-header-branding-body .name`
 - `.company-header-branding-body .summary .summary-item`
 - `.company-header .add-ons .home a.button-home`
+- `.corpInfo`
 
 ### Avoid
 
@@ -332,6 +351,7 @@ def normalize_company_fact(label: str, value: str) -> tuple[str | None, str | No
 ### Secondary
 
 - 테이블이 없다면 `기업정보` 헤더 근처의 `th`/`td` 구조 탐색
+- classic 테이블이 없다면 `Super` 페이지의 `.corpInfo` 블록 탐색
 - 일부 필드만 누락됐다면 헤더 영역의 회사명/업종/홈페이지 링크로 보강
 
 ### Tertiary
@@ -391,6 +411,8 @@ Company profile table not found: <company_page_url>
 - row 내부의 다중 `th/td` pair를 전부 순회한다.
 - `기업구분`, `기업형태`, `기업규모`를 같은 분류군으로 취급한다.
 - `설립일`은 parser에서 연도 추출, validator에서 범위 검증을 수행한다.
+- classic 회사 페이지 외에 `Super` 회사 페이지의 `.corpInfo` 구조도 파싱한다.
+- 다만 요청 중 관찰된 리다이렉트 `final_url`을 DB의 `company_page_url`에 다시 저장하는 로직은 현재 parser 책임 밖이며, 별도 정책 결정이 필요하다.
 
 현재 기준의 남은 권장 보강:
 

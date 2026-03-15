@@ -70,17 +70,19 @@
 - `JobList`를 찾지 못할 때 전역 `CardJob`로 폴백하는 경로가 남아 있어, live 구조가 크게 바뀌면 다시 과수집 가능성이 있음
 - 기존 데이터 중 `company_page_url`가 아직 비어 있는 회사는 첫 Phase 2 보강 시 한 번은 JD를 열어야 함
 - historical artifact 기준 `Co_Read -> Super` 리다이렉트 경로에서 timeout이 한 번 기록됐지만, 2026-03-15 current live rerun과 5건 mixed smoke sample에서는 동일 증상이 재현되지 않음
+- 현재는 `Co_Read -> Super` 리다이렉트가 일어나도 관찰된 `final_url`을 `companies.company_page_url`에 재저장하지 않으므로, 캐시 정규화 여부를 아직 결정하지 못한 상태다
 - 현재 기본 Phase 2 대상 조회는 `company_size IS NULL` 기준이라 일부 필드만 비어 있는 회사는 자동 재보강 대상에서 빠질 수 있음
 - 저장된 `company_page_url`가 stale하거나 실패하는 경우 JD로 재해결하는 fallback은 아직 없다
 - JD/회사 페이지 selector 회귀 검증은 아직 소수 fixture 중심이라 레이아웃 변형 대응 범위가 좁음
 
 ## Next Priorities
 
-1. Phase 2 대상 선택을 `company_size IS NULL` 단일 조건에서 넓힐지 판단
-2. `Super` 회사 페이지 fixture를 더 확보해 redirect/layout variation 회귀 범위 확장
-3. 저장된 `company_page_url` 실패 시 JD 재해결 fallback을 넣을지 판단
-4. `scripts/run_crawler.sh` 기반 일일 자동 실행 실제 적용
-5. `crawl_runs` 기반 운영 상태 요약 기능 추가
+1. 리다이렉트된 `final_url`을 `companies.company_page_url` 캐시에 반영할지 판단
+2. Phase 2 대상 선택을 `company_size IS NULL` 단일 조건에서 넓힐지 판단
+3. `Super` 회사 페이지 fixture를 더 확보해 redirect/layout variation 회귀 범위 확장
+4. 저장된 `company_page_url` 실패 시 JD 재해결 fallback을 넣을지 판단
+5. `scripts/run_crawler.sh` 기반 일일 자동 실행 실제 적용
+6. `crawl_runs` 기반 운영 상태 요약 기능 추가
 
 즉시 실행용 문서:
 
