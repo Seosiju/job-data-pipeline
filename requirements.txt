@@ -16,3 +16,7 @@ seaborn>=0.13.0
 jupyter>=1.0.0
 streamlit>=1.30.0
 plotly>=5.18.0
+
+# LLM Parsing (OCR text extraction)
+langchain>=0.3.0
+langchain-openai>=0.2.0
