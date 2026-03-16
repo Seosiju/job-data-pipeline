@@ -101,6 +101,9 @@ DB_USER=postgres
 DB_PASSWORD=your_password_here
 
 SEARCH_KEYWORDS=데이터분석가,사업기획,프로젝트매니저
+SEARCH_LOCATIONS=서울,인천
+SEARCH_EXPERIENCE_TYPES=신입,경력무관
+SEARCH_EMPLOYMENT_TYPES=정규직,계약직,인턴
 MAX_PAGES=5
 REQUEST_DELAY_MIN=2
 REQUEST_DELAY_MAX=5
@@ -117,6 +120,8 @@ LOG_DIR=log
 - 코드 기본 포트는 `5433`입니다.
 - 로컬 PostgreSQL이 `5432`를 쓰면 `.env`에서 바꾸면 됩니다.
 - 메인 경로는 `SEARCH_KEYWORDS`이고, `SEARCH_KEYWORD`는 하위 호환성용입니다.
+- `SEARCH_LOCATIONS`, `SEARCH_EXPERIENCE_TYPES`, `SEARCH_EMPLOYMENT_TYPES`는 검색 결과 메인 `JobList` 카드와 hydration 메타데이터를 기준으로 **저장 전 필터**를 적용합니다.
+- 현재 구현은 잡코리아 UI 필터를 Selenium으로 클릭하지 않고, fixture로 검증한 카드/metadata를 기준으로 로컬 필터링합니다.
 
 ### 3. 데이터베이스 준비
 
@@ -174,9 +179,8 @@ pytest tests/ -q
 
 현재 기준 결과:
 
-- Phase 1/2 parser+main+script 검증: `31 passed`
-- Phase 2 smoke path 검증: `29 passed`
-- 전체 테스트: `104 passed`
+- Phase 1 검색 필터/파서/메인 경로 검증: `41 passed`
+- 전체 테스트: `113 passed`
 
 실DB 통합 테스트를 별도 인스턴스에 붙이는 예시:
 

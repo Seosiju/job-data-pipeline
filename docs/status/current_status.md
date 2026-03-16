@@ -31,6 +31,7 @@
 - 잡코리아 Phase 1/Phase 2 오케스트레이션 코드 경로
 - PostgreSQL 적재
 - 다중 키워드 실행
+- env 기반 Phase 1 지역/경력/고용형태 필터
 - 증분 크롤링
 - 공고 lifecycle 추적
 - 공고 변경 이력 저장
@@ -54,9 +55,8 @@
 
 ## Latest Verification
 
-- Phase 1/2 parser+main+script 검증: `pytest tests/test_main.py tests/test_parser.py tests/test_analyze_detail_page.py -q` -> `31 passed`
-- Phase 2 smoke path 검증: `pytest tests/test_main.py tests/test_database.py tests/test_phase2_smoke_test.py -q` -> `29 passed`
-- 전체 테스트: `pytest tests/ -q` -> `110 passed`
+- Phase 1 검색 필터/파서/메인 경로 검증: `pytest tests/test_config.py tests/test_parser.py tests/test_main.py -q` -> `41 passed`
+- 전체 테스트: `pytest tests/ -q` -> `113 passed`
 - live smoke test: `venv/bin/python scripts/phase2_smoke_test.py --limit 1 --headless true`
   - 결과: 현재 기본 대상 `한영회계법인(id=59)`가 정상 업데이트되고 final URL/title이 출력됨
 - targeted live smoke test: `venv/bin/python scripts/phase2_smoke_test.py --limit 1 --company-id 58 --headless true`
@@ -68,6 +68,7 @@
 
 - Phase 1 검색 결과 파서는 현재 fixture 기준으로 안정화됐지만, fixture가 1개라 DOM drift 탐지 범위는 아직 좁음
 - `JobList`를 찾지 못할 때 전역 `CardJob`로 폴백하는 경로가 남아 있어, live 구조가 크게 바뀌면 다시 과수집 가능성이 있음
+- Phase 1 지역/경력/고용형태 필터는 현재 메인 `JobList` 카드 텍스트와 hydration 메타데이터 기준이므로, live hydration 구조가 크게 바뀌면 고용형태 판별이 먼저 흔들릴 수 있음
 - 기존 데이터 중 `company_page_url`가 아직 비어 있는 회사는 첫 Phase 2 보강 시 한 번은 JD를 열어야 함
 - historical artifact 기준 `Co_Read -> Super` 리다이렉트 경로에서 timeout이 한 번 기록됐지만, 2026-03-15 current live rerun과 5건 mixed smoke sample에서는 동일 증상이 재현되지 않음
 - 현재는 `Co_Read -> Super` 리다이렉트가 일어나도 관찰된 `final_url`을 `companies.company_page_url`에 재저장하지 않으므로, 캐시 정규화 여부를 아직 결정하지 못한 상태다

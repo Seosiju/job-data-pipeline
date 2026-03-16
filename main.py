@@ -26,6 +26,7 @@ from datetime import datetime
 from config import Config, setup_logging
 from crawler import JobKoreaCrawler
 from parser import (
+    filter_jobs_by_search_preferences,
     parse_company_detail,
     parse_company_page_url_from_job_detail,
     parse_job_cards,
@@ -132,6 +133,21 @@ def run_phase1_for_keyword(keyword: str, config: Config, db: DatabaseManager) ->
                     stats["pages_crawled"] = page_num
                     logger.debug(f"페이지 {page_num} 파싱 중...")
                     jobs = parse_job_cards(html)
+                    filtered_jobs = filter_jobs_by_search_preferences(
+                        jobs,
+                        allowed_locations=getattr(config, "SEARCH_LOCATIONS", []),
+                        allowed_experience_types=getattr(config, "SEARCH_EXPERIENCE_TYPES", []),
+                        allowed_employment_types=getattr(config, "SEARCH_EMPLOYMENT_TYPES", []),
+                    )
+                    if len(filtered_jobs) != len(jobs):
+                        logger.info(
+                            "검색 조건 필터 적용 - 키워드: %s, 페이지: %s, 원본: %s건, 통과: %s건",
+                            keyword,
+                            page_num,
+                            len(jobs),
+                            len(filtered_jobs),
+                        )
+                    jobs = filtered_jobs
 
                     for job in jobs:
                         company_name = job.get("company", "").strip()

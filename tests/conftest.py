@@ -23,6 +23,9 @@ TEST_ENV_DEFAULTS = {
     "DB_PASSWORD": "jobkorea123",
     "SEARCH_KEYWORD": "데이터분석가",
     "SEARCH_KEYWORDS": "데이터분석가",
+    "SEARCH_LOCATIONS": "",
+    "SEARCH_EXPERIENCE_TYPES": "",
+    "SEARCH_EMPLOYMENT_TYPES": "",
     "MAX_PAGES": "5",
     "HEADLESS": "true",
     "REQUEST_DELAY_MIN": "2",
@@ -79,6 +82,9 @@ def mock_env(monkeypatch):
     monkeypatch.setenv("DB_PASSWORD", "testpass")
     monkeypatch.setenv("SEARCH_KEYWORD", "테스트키워드")
     monkeypatch.setenv("SEARCH_KEYWORDS", "테스트키워드")
+    monkeypatch.setenv("SEARCH_LOCATIONS", "서울,인천")
+    monkeypatch.setenv("SEARCH_EXPERIENCE_TYPES", "신입,경력무관")
+    monkeypatch.setenv("SEARCH_EMPLOYMENT_TYPES", "정규직,계약직,인턴")
     monkeypatch.setenv("MAX_PAGES", "3")
     monkeypatch.setenv("HEADLESS", "false")
     monkeypatch.setenv("RETRY_ATTEMPTS", "5")

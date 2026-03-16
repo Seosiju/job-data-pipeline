@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 
 from parser import (
     extract_card_data,
+    filter_jobs_by_search_preferences,
     parse_company_detail,
     parse_company_page_url_from_job_detail,
     parse_job_cards,
@@ -145,6 +146,43 @@ class TestParseJobCards:
         jobs = parse_job_cards(sample_list_html)
 
         assert len(jobs) == 20
+
+    def test_parse_job_cards_enriches_experience_and_employment_from_hydration(self, sample_list_html):
+        """hydration metadata 기준 경력 타입과 고용형태를 카드에 보강해야 한다"""
+        jobs = parse_job_cards(sample_list_html)
+
+        first_job = jobs[0]
+        internship_job = next(
+            job for job in jobs
+            if job["detail_url"].startswith("https://www.jobkorea.co.kr/Recruit/GI_Read/48663765")
+        )
+
+        assert first_job["experience_type"] == "신입·경력"
+        assert first_job["employment_types"] == ["정규직"]
+        assert first_job["location_codes"] == ["I080", "I150", "I200", "I240"]
+
+        assert internship_job["experience_type"] == "신입"
+        assert internship_job["employment_types"] == ["인턴"]
+
+    def test_filter_jobs_by_search_preferences_keeps_only_matching_main_results(self, sample_list_html):
+        """서울/인천 + 신입/경력무관 + 정규직/계약직/인턴 조건만 통과해야 한다"""
+        jobs = parse_job_cards(sample_list_html)
+
+        filtered_jobs = filter_jobs_by_search_preferences(
+            jobs,
+            allowed_locations=["서울", "인천"],
+            allowed_experience_types=["신입", "경력무관"],
+            allowed_employment_types=["정규직", "계약직", "인턴"],
+        )
+
+        assert len(filtered_jobs) == 3
+        assert {
+            job["title"] for job in filtered_jobs
+        } == {
+            "2026년 상반기 신입사원 채용 (채용연계형 인턴십) - 사업기획",
+            "[헤트라스] 사업기획 인턴(전환형)",
+            "디아더스와 함께 할 사업기획 담당자 모집합니다.",
+        }
 
     def test_all_parsed_cards_have_jd_url_title_and_company(self, sample_list_html):
         """메인 목록에 포함된 모든 카드는 JD URL, 제목, 회사명이 있어야 한다"""
@@ -337,12 +375,15 @@ class TestExtractCardData:
             "company",
             "location",
             "experience",
+            "experience_type",
             "detail_url",
             "industry",
             "job_category",
             "salary",
             "badge",
             "apply_type",
+            "employment_types",
+            "location_codes",
             "posted_date",
             "deadline",
             "benefits",

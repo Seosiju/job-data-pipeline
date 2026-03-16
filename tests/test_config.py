@@ -19,6 +19,9 @@ class TestConfig:
         assert config.DB_PORT == "5433"
         assert config.DB_NAME == "jobkorea"
         assert config.SEARCH_KEYWORD == "데이터분석가"
+        assert config.SEARCH_LOCATIONS == []
+        assert config.SEARCH_EXPERIENCE_TYPES == []
+        assert config.SEARCH_EMPLOYMENT_TYPES == []
         assert config.MAX_PAGES == 5
         assert config.RETRY_ATTEMPTS == 3
         assert config.CONSECUTIVE_DUPLICATE_THRESHOLD == 20
@@ -56,6 +59,9 @@ class TestConfig:
         assert config.DB_PORT == "5432"
         assert config.DB_NAME == "testdb"
         assert config.SEARCH_KEYWORD == "테스트키워드"
+        assert config.SEARCH_LOCATIONS == ["서울", "인천"]
+        assert config.SEARCH_EXPERIENCE_TYPES == ["신입", "경력무관"]
+        assert config.SEARCH_EMPLOYMENT_TYPES == ["정규직", "계약직", "인턴"]
         assert config.MAX_PAGES == 3
         assert config.RETRY_ATTEMPTS == 5
         assert config.CONSECUTIVE_DUPLICATE_THRESHOLD == 7

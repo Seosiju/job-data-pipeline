@@ -447,11 +447,13 @@ def parse_search_pagination(html: str) -> dict[str, str | list[str]]
 - `_extract_title()`와 `_extract_company()`는 `GI_Read` anchor 내부 selector 사용
 - `_extract_apply_type()`는 해시 클래스 대신 버튼 텍스트 기반으로 동작
 - `_extract_location()`, `_extract_industry()`, `_extract_job_category()`, `_extract_salary()`는 아이콘 기반 `GrayChip` 식별 유지
+- 카드별 `job id`를 기준으로 hydration metadata에서 `careerType`, `employmentTypeCodeList`, `areaCodeList`를 복원해 `experience_type`, `employment_types`, `location_codes`를 보강한다
+- env의 `SEARCH_LOCATIONS`, `SEARCH_EXPERIENCE_TYPES`, `SEARCH_EMPLOYMENT_TYPES`는 위 카드/hydration 메타데이터를 기준으로 저장 전 필터에 사용된다
 
 현재 기준의 남은 권장 보강:
 
 - `JobList` 미탐지 시 전역 `CardJob` 폴백 경로를 어떻게 다룰지 명확히 결정
-- 페이지네이션 파서를 별도 함수로 분리할지 판단
+- hydration metadata 파서가 live script 구조 변경에 얼마나 견디는지 fixture를 더 확보해 검증
 
 ## 10. 테스트 포인트
 

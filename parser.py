@@ -38,24 +38,66 @@ COMPANY_HEADER_HOMEPAGE_SELECTOR = (
 )
 SUPER_COMPANY_INFO_SELECTOR = '.corpInfo'
 
+CAREER_TYPE_MAP = {
+    "1": "신입",
+    "2": "경력",
+    "3": "신입·경력",
+    "4": "경력무관",
+}
+
+EMPLOYMENT_TYPE_MAP = {
+    "1": "정규직",
+    "2": "계약직",
+    "3": "인턴",
+}
+
 
 def parse_job_cards(html_source):
     """HTML에서 채용공고 카드를 파싱하여 리스트로 반환"""
     soup = BeautifulSoup(html_source, "html.parser")
     cards = _find_job_cards(soup)
+    metadata_by_job_id = _build_search_metadata_by_job_id(html_source, cards)
 
     logger.debug("목록 카드 수: %s", len(cards))
     jobs = []
 
     for i, card in enumerate(cards, 1):
         try:
-            job = extract_card_data(card)
+            job_id = _extract_job_id_from_card(card)
+            job = extract_card_data(card, metadata_by_job_id.get(job_id))
             jobs.append(job)
             logger.debug("카드 파싱 성공 [%s] %s - %s", i, job["company"], job["title"])
         except Exception as e:
             logger.warning("카드 파싱 실패 [%s]: %s", i, e)
 
     return jobs
+
+
+def filter_jobs_by_search_preferences(
+    jobs: list[dict],
+    allowed_locations: list[str] | None = None,
+    allowed_experience_types: list[str] | None = None,
+    allowed_employment_types: list[str] | None = None,
+) -> list[dict]:
+    """env 기반 검색 선호 조건으로 공고 목록을 필터링한다."""
+    allowed_locations = _normalize_filter_values(allowed_locations)
+    allowed_experience_types = _normalize_filter_values(allowed_experience_types)
+    allowed_employment_types = _normalize_filter_values(allowed_employment_types)
+
+    if not any((allowed_locations, allowed_experience_types, allowed_employment_types)):
+        return jobs
+
+    filtered = []
+    for job in jobs:
+        if not _matches_location_filter(job, allowed_locations):
+            continue
+        if not _matches_experience_filter(job, allowed_experience_types):
+            continue
+        if not _matches_employment_filter(job, allowed_employment_types):
+            continue
+        filtered.append(job)
+
+    return filtered
 
 
 def parse_company_page_url_from_job_detail(html: str) -> str | None:
@@ -98,6 +140,94 @@ def _to_absolute_jobkorea_url(url: str) -> str:
     return url
 
 
+def _normalize_filter_values(values: list[str] | None) -> list[str]:
+    """필터 입력 리스트를 빈 값 없이 정규화한다."""
+    if not values:
+        return []
+    return [value.strip() for value in values if value and value.strip()]
+
+
+def _extract_job_id_from_detail_url(detail_url: str) -> str | None:
+    """GI_Read 상세 URL에서 job id를 추출한다."""
+    match = re.search(r"/Recruit/GI_Read/(\d+)", detail_url or "")
+    if not match:
+        return None
+    return match.group(1)
+
+
+def _extract_job_id_from_card(card) -> str | None:
+    """카드에서 job id를 추출한다."""
+    return _extract_job_id_from_detail_url(_extract_detail_url(card))
+
+
+def _build_search_metadata_by_job_id(html_source: str, cards) -> dict[str, dict]:
+    """검색 결과 hydration에서 카드별 메타데이터를 복원한다."""
+    metadata_by_job_id: dict[str, dict] = {}
+
+    for card in cards:
+        job_id = _extract_job_id_from_card(card)
+        if not job_id or job_id in metadata_by_job_id:
+            continue
+        metadata_by_job_id[job_id] = _extract_search_metadata_for_job_id(
+            html_source,
+            job_id,
+        )
+
+    return metadata_by_job_id
+
+
+def _extract_search_metadata_for_job_id(html_source: str, job_id: str) -> dict:
+    """특정 job id에 대한 hydration 메타데이터를 추출한다."""
+    pattern = re.compile(
+        rf'\\\"id\\\":\\\"{re.escape(job_id)}\\\"'
+        rf'.*?\\\"employmentTypeCodeList\\\":\[(?P<employment>.*?)\]'
+        rf'.*?\\\"areaCodeList\\\":\[(?P<areas>.*?)\]'
+        rf'.*?\\\"careerType\\\":\\\"(?P<career>.*?)\\\"',
+        re.S,
+    )
+    match = pattern.search(html_source)
+    if not match:
+        return {
+            "experience_type": None,
+            "employment_types": [],
+            "location_codes": [],
+        }
+
+    location_codes = _parse_escaped_list_fragment(match.group("areas"))
+    employment_codes = _parse_escaped_list_fragment(match.group("employment"))
+    career_type = CAREER_TYPE_MAP.get(match.group("career"))
+
+    return {
+        "experience_type": career_type,
+        "employment_types": _map_employment_codes_to_labels(employment_codes),
+        "location_codes": location_codes,
+    }
+
+
+def _parse_escaped_list_fragment(fragment: str) -> list[str]:
+    """next.js hydration 안의 escaped list fragment를 리스트로 정규화한다."""
+    if not fragment or not fragment.strip():
+        return []
+
+    values = []
+    for item in fragment.split(","):
+        normalized = item.strip().strip('"').replace('\\"', "").replace("\\", "").strip()
+        if normalized:
+            values.append(normalized)
+    return values
+
+
+def _map_employment_codes_to_labels(codes: list[str]) -> list[str]:
+    """잡코리아 employment code를 사람이 읽는 라벨로 변환한다."""
+    labels = []
+    for code in codes:
+        normalized_code = code.split("/")[0]
+        label = EMPLOYMENT_TYPE_MAP.get(normalized_code)
+        if label and label not in labels:
+            labels.append(label)
+    return labels
+
+
 def _extract_gray_chip_text(card, icon_selector: str) -> str:
     """아이콘 기준으로 GrayChip 텍스트를 추출한다."""
     chip_icon = card.select_one(f"{GRAY_CHIP_SELECTOR} {icon_selector}")
@@ -112,7 +242,7 @@ def _extract_gray_chip_text(card, icon_selector: str) -> str:
     return text_el.get_text(strip=True) if text_el else ""
 
 
-def extract_card_data(card):
+def extract_card_data(card, search_metadata: dict | None = None):
     """
     개별 카드에서 전체 데이터 추출
 
@@ -122,21 +252,92 @@ def extract_card_data(card):
     Returns:
         dict: 추출된 채용공고 정보
     """
+    detail_url = _extract_detail_url(card)
+    experience = _extract_experience(card)
+    title = _extract_title(card)
+    metadata = search_metadata or {}
+
     return {
-        "title": _extract_title(card),
+        "title": title,
         "company": _extract_company(card),
         "location": _extract_location(card),
-        "experience": _extract_experience(card),
-        "detail_url": _extract_detail_url(card),
+        "experience": experience,
+        "experience_type": metadata.get("experience_type") or _infer_experience_type(experience),
+        "detail_url": detail_url,
         "industry": _extract_industry(card),
         "job_category": _extract_job_category(card),
         "salary": _extract_salary(card),
         "badge": _extract_badge(card),
         "apply_type": _extract_apply_type(card),
+        "employment_types": metadata.get("employment_types", []) or _infer_employment_types(title),
+        "location_codes": metadata.get("location_codes", []),
         "posted_date": _extract_posted_date(card),
         "deadline": _extract_deadline(card),
         "benefits": _extract_benefits(card),
     }
+
+
+def _infer_experience_type(experience_text: str) -> str | None:
+    """카드 텍스트에서 경력 타입을 추론한다."""
+    normalized = (experience_text or "").strip()
+    if not normalized:
+        return None
+    if "경력무관" in normalized:
+        return "경력무관"
+    if "신입" in normalized and "경력" in normalized:
+        return "신입·경력"
+    if "신입" in normalized:
+        return "신입"
+    if "경력" in normalized:
+        return "경력"
+    return None
+
+
+def _infer_employment_types(title: str) -> list[str]:
+    """카드 텍스트만 있을 때 고용형태를 보수적으로 추론한다."""
+    normalized = (title or "").strip()
+    if "인턴" in normalized:
+        return ["인턴"]
+    return []
+
+
+def _extract_location_region(location: str) -> str | None:
+    """카드 위치 텍스트에서 대표 지역명을 추출한다."""
+    normalized = (location or "").strip()
+    if not normalized:
+        return None
+    return normalized.split()[0]
+
+
+def _matches_location_filter(job: dict, allowed_locations: list[str]) -> bool:
+    """지역 필터 일치 여부"""
+    if not allowed_locations:
+        return True
+
+    region = _extract_location_region(job.get("location", ""))
+    if region and region in allowed_locations:
+        return True
+
+    location_text = (job.get("location") or "").strip()
+    return any(location in location_text for location in allowed_locations)
+
+
+def _matches_experience_filter(job: dict, allowed_experience_types: list[str]) -> bool:
+    """경력 타입 필터 일치 여부"""
+    if not allowed_experience_types:
+        return True
+
+    experience_type = job.get("experience_type") or _infer_experience_type(job.get("experience", ""))
+    return experience_type in allowed_experience_types
+
+
+def _matches_employment_filter(job: dict, allowed_employment_types: list[str]) -> bool:
+    """고용형태 필터 일치 여부"""
+    if not allowed_employment_types:
+        return True
+
+    employment_types = job.get("employment_types") or _infer_employment_types(job.get("title", ""))
+    return bool(set(employment_types) & set(allowed_employment_types))
 
 
 def _extract_title(card) -> str:

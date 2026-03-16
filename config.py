@@ -13,6 +13,16 @@ load_dotenv()
 PROJECT_ROOT = Path(__file__).parent
 
 
+SUPPORTED_EXPERIENCE_TYPES = ("신입", "경력", "신입·경력", "경력무관")
+SUPPORTED_EMPLOYMENT_TYPES = ("정규직", "계약직", "인턴")
+
+
+def _parse_csv_env(name: str, default: str = "") -> list[str]:
+    """쉼표 구분 환경변수를 리스트로 정규화"""
+    raw = os.getenv(name, default)
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
 def setup_logging(log_level: str = "INFO", log_dir: str = "log") -> logging.Logger:
     """로깅 시스템 초기화.
 
@@ -77,9 +87,13 @@ class Config:
         "SEARCH_KEYWORDS",
         "데이터분석가"
     ).split(",")
+    SEARCH_KEYWORDS: list[str] = [keyword.strip() for keyword in SEARCH_KEYWORDS if keyword.strip()]
 
     # 단일 키워드 (하위 호환성)
     SEARCH_KEYWORD: str = os.getenv("SEARCH_KEYWORD", "데이터분석가")
+    SEARCH_LOCATIONS: list[str] = _parse_csv_env("SEARCH_LOCATIONS")
+    SEARCH_EXPERIENCE_TYPES: list[str] = _parse_csv_env("SEARCH_EXPERIENCE_TYPES")
+    SEARCH_EMPLOYMENT_TYPES: list[str] = _parse_csv_env("SEARCH_EMPLOYMENT_TYPES")
 
     MAX_PAGES: int = int(os.getenv("MAX_PAGES", "5"))
     DELAY_MIN: int = int(os.getenv("REQUEST_DELAY_MIN", "2"))
@@ -114,6 +128,26 @@ class Config:
 
         if not self.SEARCH_KEYWORDS or self.SEARCH_KEYWORDS == [""]:
             warnings.append("SEARCH_KEYWORDS가 비어있습니다")
+
+        invalid_experience_types = [
+            value for value in self.SEARCH_EXPERIENCE_TYPES
+            if value not in SUPPORTED_EXPERIENCE_TYPES
+        ]
+        if invalid_experience_types:
+            warnings.append(
+                "SEARCH_EXPERIENCE_TYPES에 지원하지 않는 값이 있습니다: "
+                + ", ".join(invalid_experience_types)
+            )
+
+        invalid_employment_types = [
+            value for value in self.SEARCH_EMPLOYMENT_TYPES
+            if value not in SUPPORTED_EMPLOYMENT_TYPES
+        ]
+        if invalid_employment_types:
+            warnings.append(
+                "SEARCH_EMPLOYMENT_TYPES에 지원하지 않는 값이 있습니다: "
+                + ", ".join(invalid_employment_types)
+            )
 
         if self.RETRY_ATTEMPTS < 1:
             warnings.append("RETRY_ATTEMPTS는 1 이상이어야 합니다")

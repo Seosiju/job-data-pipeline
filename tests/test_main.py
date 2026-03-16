@@ -222,6 +222,67 @@ class TestRunPhase1ForKeyword:
             "status": "completed",
         }
 
+    def test_applies_phase1_search_filters_before_saving(self, monkeypatch):
+        """환경설정 기반 검색 조건에 맞는 공고만 저장해야 한다"""
+        db = FakeDB(["inserted"])
+        config = type(
+            "Config",
+            (),
+            {
+                "CONSECUTIVE_DUPLICATE_THRESHOLD": 10,
+                "SEARCH_LOCATIONS": ["서울", "인천"],
+                "SEARCH_EXPERIENCE_TYPES": ["신입", "경력무관"],
+                "SEARCH_EMPLOYMENT_TYPES": ["정규직", "계약직", "인턴"],
+            },
+        )()
+
+        def fake_parse_job_cards(html):
+            if html == "<page-1>":
+                return [
+                    {
+                        "company": "조건통과회사",
+                        "detail_url": "https://example.com/pass",
+                        "location": "서울 강남구",
+                        "experience": "신입",
+                        "experience_type": "신입",
+                        "employment_types": ["인턴"],
+                    },
+                    {
+                        "company": "지역불일치회사",
+                        "detail_url": "https://example.com/fail-location",
+                        "location": "부산 해운대구",
+                        "experience": "신입",
+                        "experience_type": "신입",
+                        "employment_types": ["정규직"],
+                    },
+                    {
+                        "company": "경력불일치회사",
+                        "detail_url": "https://example.com/fail-experience",
+                        "location": "서울 종로구",
+                        "experience": "경력3년↑",
+                        "experience_type": "경력",
+                        "employment_types": ["정규직"],
+                    },
+                ]
+            return []
+
+        monkeypatch.setattr(main_module, "JobKoreaCrawler", FakeCrawler)
+        monkeypatch.setattr(main_module, "parse_job_cards", fake_parse_job_cards)
+        monkeypatch.setattr(main_module, "validate_job_posting", lambda job: job)
+
+        stats = main_module.run_phase1_for_keyword("사업기획", config, db)
+
+        assert stats["inserted"] == 1
+        assert stats["updated"] == 0
+        assert stats["unchanged"] == 0
+        assert stats["pages_crawled"] == 2
+        assert db.completed == {
+            "run_id": 1,
+            "pages": 2,
+            "jobs": 1,
+            "status": "completed",
+        }
+
 
 class TestRunPhase2:
     """run_phase2 동작 테스트"""
