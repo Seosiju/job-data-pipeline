@@ -17,3 +17,6 @@ log/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# oh-my-claudecode
+.omc/
