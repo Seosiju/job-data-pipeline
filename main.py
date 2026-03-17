@@ -32,7 +32,7 @@ from parser import (
     parse_job_cards,
 )
 from database import DatabaseManager
-from validators import validate_job_posting, validate_company_details
+from validators import validate_job_posting, validate_company_details, is_ad_posting
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +154,12 @@ def run_phase1_for_keyword(keyword: str, config: Config, db: DatabaseManager) ->
                         if not company_name:
                             stats["skipped"] += 1
                             duplicate_streak = 0
+                            continue
+
+                        # 광고성 공고 필터링
+                        title = job.get("title", "")
+                        if is_ad_posting(title):
+                            stats["skipped"] += 1
                             continue
 
                         try:
