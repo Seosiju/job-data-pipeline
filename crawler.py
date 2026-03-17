@@ -31,6 +31,7 @@ BASE_URL = (
     "&Page_No={page}"
     "&careerType=1,4"
     "&tabType=recruit"
+    "&ord=ReadCntDesc"  # 조회수 내림차순 정렬
 )
 
 
