@@ -172,6 +172,27 @@ class DatabaseManager:
                 );
             """))
 
+            # JD 분석 결과 테이블
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS job_posting_analysis (
+                    id                      SERIAL PRIMARY KEY,
+                    job_posting_id          INTEGER REFERENCES job_postings(id) ON DELETE CASCADE UNIQUE,
+                    is_multi_position       BOOLEAN DEFAULT FALSE,
+                    position_count          INTEGER DEFAULT 1,
+                    positions               JSONB DEFAULT '[]',
+                    required_education      VARCHAR(100),
+                    required_experience     VARCHAR(100),
+                    required_skills         JSONB DEFAULT '[]',
+                    preferred_skills        JSONB DEFAULT '[]',
+                    preferred_certifications JSONB DEFAULT '[]',
+                    preferred_experience    JSONB DEFAULT '[]',
+                    company_domain          VARCHAR(50),
+                    job_category            VARCHAR(50),
+                    analysis_confidence     VARCHAR(20),
+                    analyzed_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
+
             self._ensure_companies_schema(conn)
             self._ensure_job_postings_schema(conn)
             self._backfill_job_posting_lifecycle(conn)
@@ -199,6 +220,13 @@ class DatabaseManager:
         ))
         conn.execute(text(
             "ALTER TABLE job_postings ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+        ))
+        # JD 텍스트 추출용 컬럼
+        conn.execute(text(
+            "ALTER TABLE job_postings ADD COLUMN IF NOT EXISTS raw_jd_text TEXT"
+        ))
+        conn.execute(text(
+            "ALTER TABLE job_postings ADD COLUMN IF NOT EXISTS jd_extracted_at TIMESTAMP"
         ))
 
     def _backfill_job_posting_lifecycle(self, conn):
