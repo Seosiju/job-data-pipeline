@@ -40,6 +40,42 @@ def load_data():
     return df, df_jobs, df_companies
 
 
+@st.cache_data(ttl=300)
+def load_analysis_data():
+    """LLM 분석 데이터 로드"""
+    engine = get_db_connection()
+
+    # 분석 데이터 존재 여부 확인
+    try:
+        df_analysis = pd.read_sql('''
+            SELECT jpa.*, jp.title, c.name as company_name
+            FROM job_posting_analysis jpa
+            JOIN job_postings jp ON jpa.job_posting_id = jp.id
+            JOIN companies c ON jp.company_id = c.id
+        ''', engine)
+
+        # 스킬 집계
+        required_skills = pd.read_sql('''
+            SELECT skill, COUNT(*) as cnt
+            FROM job_posting_analysis,
+                 jsonb_array_elements_text(required_skills) as skill
+            GROUP BY skill
+            ORDER BY cnt DESC
+        ''', engine)
+
+        preferred_skills = pd.read_sql('''
+            SELECT skill, COUNT(*) as cnt
+            FROM job_posting_analysis,
+                 jsonb_array_elements_text(preferred_skills) as skill
+            GROUP BY skill
+            ORDER BY cnt DESC
+        ''', engine)
+
+        return df_analysis, required_skills, preferred_skills
+    except:
+        return None, None, None
+
+
 def normalize_location(loc):
     """지역 정규화"""
     if pd.isna(loc):
@@ -132,7 +168,7 @@ def main():
     st.sidebar.markdown(f"**필터 결과: {len(filtered_df):,}개 공고**")
 
     # 메인 차트
-    tab1, tab2, tab3, tab4 = st.tabs(["🗺️ 지역별", "📈 경력별", "🏢 회사규모별", "🔑 키워드별"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🗺️ 지역별", "📈 경력별", "🏢 회사규모별", "🔑 키워드별", "🎯 스킬분석"])
 
     with tab1:
         col1, col2 = st.columns(2)
@@ -276,6 +312,138 @@ def main():
                 st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("키워드 데이터가 없습니다.")
+
+    with tab5:
+        # LLM 분석 데이터 로드
+        df_analysis, required_skills, preferred_skills = load_analysis_data()
+
+        if df_analysis is not None and len(df_analysis) > 0:
+            st.subheader(f"📊 LLM 분석 결과 ({len(df_analysis)}개 공고)")
+
+            # KPI 카드
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("분석 완료", f"{len(df_analysis)}개")
+            with col2:
+                multi = df_analysis['is_multi_position'].sum()
+                st.metric("다중 포지션", f"{multi}개", f"{multi/len(df_analysis)*100:.0f}%")
+            with col3:
+                da_count = (df_analysis['job_category'] == '데이터분석').sum()
+                st.metric("데이터분석 직무", f"{da_count}개")
+            with col4:
+                high_conf = (df_analysis['analysis_confidence'] == 'high').sum()
+                st.metric("높은 신뢰도", f"{high_conf}개", f"{high_conf/len(df_analysis)*100:.0f}%")
+
+            st.markdown("---")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("🔧 필수 스킬 TOP 15")
+                top_required = required_skills.head(15)
+                fig = px.bar(
+                    top_required,
+                    x='cnt',
+                    y='skill',
+                    orientation='h',
+                    color='cnt',
+                    color_continuous_scale='Blues'
+                )
+                fig.update_layout(
+                    showlegend=False,
+                    yaxis={'categoryorder': 'total ascending'},
+                    xaxis_title="등장 횟수",
+                    yaxis_title=""
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+            with col2:
+                st.subheader("⭐ 우대 스킬 TOP 15")
+                top_preferred = preferred_skills.head(15)
+                fig = px.bar(
+                    top_preferred,
+                    x='cnt',
+                    y='skill',
+                    orientation='h',
+                    color='cnt',
+                    color_continuous_scale='Oranges'
+                )
+                fig.update_layout(
+                    showlegend=False,
+                    yaxis={'categoryorder': 'total ascending'},
+                    xaxis_title="등장 횟수",
+                    yaxis_title=""
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+            st.markdown("---")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("💼 직무 카테고리 분포")
+                job_cat = df_analysis['job_category'].value_counts().head(10)
+                fig = px.pie(
+                    values=job_cat.values,
+                    names=job_cat.index,
+                    color_discrete_sequence=px.colors.qualitative.Set2
+                )
+                fig.update_traces(textposition='inside', textinfo='percent+label')
+                st.plotly_chart(fig, use_container_width=True)
+
+            with col2:
+                st.subheader("🏭 회사 도메인 분포")
+                domain = df_analysis['company_domain'].value_counts().head(10)
+                fig = px.pie(
+                    values=domain.values,
+                    names=domain.index,
+                    color_discrete_sequence=px.colors.qualitative.Pastel
+                )
+                fig.update_traces(textposition='inside', textinfo='percent+label')
+                st.plotly_chart(fig, use_container_width=True)
+
+            # 데이터분석 직무 상세
+            st.markdown("---")
+            st.subheader("🎯 데이터분석 직무 상세")
+
+            da_df = df_analysis[df_analysis['job_category'] == '데이터분석']
+            if len(da_df) > 0:
+                col1, col2 = st.columns([1, 2])
+
+                with col1:
+                    st.markdown(f"**총 {len(da_df)}개 공고**")
+                    st.markdown("**채용 회사:**")
+                    for _, row in da_df.iterrows():
+                        st.markdown(f"- {row['company_name']}")
+
+                with col2:
+                    # 데이터분석 스킬
+                    engine = get_db_connection()
+                    da_skills = pd.read_sql('''
+                        SELECT skill, COUNT(*) as cnt
+                        FROM job_posting_analysis,
+                             jsonb_array_elements_text(required_skills) as skill
+                        WHERE job_category = '데이터분석'
+                        GROUP BY skill
+                        ORDER BY cnt DESC
+                        LIMIT 10
+                    ''', engine)
+
+                    fig = px.bar(
+                        da_skills,
+                        x='skill',
+                        y='cnt',
+                        color='cnt',
+                        color_continuous_scale='Viridis',
+                        title="데이터분석 필수 스킬"
+                    )
+                    fig.update_layout(showlegend=False, xaxis_title="", yaxis_title="등장 횟수")
+                    st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("데이터분석 직무 공고가 없습니다.")
+
+        else:
+            st.warning("LLM 분석 데이터가 없습니다. `python scripts/analyze_jd_with_llm.py`를 실행해주세요.")
 
     # 상세 데이터 테이블
     st.markdown("---")
