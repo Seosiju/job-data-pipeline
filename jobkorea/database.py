@@ -674,21 +674,3 @@ def get_engine(config: Config = None):
     return create_engine(config.database_url)
 
 
-def create_tables(engine):
-    """기존 함수 시그니처 유지 (하위 호환성)"""
-    db = DatabaseManager.__new__(DatabaseManager)
-    db.config = Config()
-    db.engine = engine
-    db.create_tables()
-
-
-def get_or_create_company(conn, company_name, industry=""):
-    """기존 함수 시그니처 유지 (하위 호환성)"""
-    db = DatabaseManager.__new__(DatabaseManager)
-    return db.get_or_create_company(conn, company_name, industry)
-
-
-def insert_job_posting(conn, company_id, job_data):
-    """기존 함수 시그니처 유지 (하위 호환성)"""
-    db = DatabaseManager.__new__(DatabaseManager)
-    return db.insert_job_posting(conn, company_id, job_data)

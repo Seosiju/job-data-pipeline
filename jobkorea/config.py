@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# 프로젝트 루트 디렉토리
-PROJECT_ROOT = Path(__file__).parent
+# 프로젝트 루트 디렉토리 (jobkorea/ 패키지의 상위)
+PROJECT_ROOT = Path(__file__).parent.parent
 
 
 SUPPORTED_EXPERIENCE_TYPES = ("신입", "경력", "신입·경력", "경력무관")
