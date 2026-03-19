@@ -5,7 +5,13 @@ Phase 1: 검색 결과 목록 페이지를 수집해 companies, job_postings에 
 Phase 2: JD 상세를 거쳐 회사 페이지를 방문해 companies를 업데이트
 """
 
-__version__ = "1.0.0"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("jobkorea-crawler")
+except PackageNotFoundError:
+    __version__ = "0.0.0"  # 패키지 미설치 시 fallback
+
 __author__ = "JobKorea Crawler Team"
 
 # Core modules

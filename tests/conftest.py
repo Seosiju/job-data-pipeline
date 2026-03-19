@@ -3,13 +3,9 @@ conftest.py - pytest fixtures
 """
 
 import os
+import sys
 import pytest
 from pathlib import Path
-import importlib
-
-# 프로젝트 루트를 path에 추가
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
