@@ -44,26 +44,31 @@ This file provides guidance to Claude Code when working with this repository.
 ## Commands
 
 ```bash
+# 패키지 설치 (editable mode)
+pip install -e .
+
 # 전체 테스트
 pytest tests/ -q
 
 # 단일 테스트 파일
-pytest tests/test_parser.py -v
+pytest tests/unit/test_parser.py -v
 
 # 특정 테스트
-pytest tests/test_parser.py::TestParseJobCards::test_parse_multiple_cards -v
+pytest tests/unit/test_parser.py::TestParseJobCards::test_parse_multiple_cards -v
 
 # 메인 크롤러 실행
+python -m jobkorea.main
+# 또는
 python main.py
 
 # 상세 페이지 구조 수동 분석
-python scripts/analyze_detail_page.py
+python scripts/dev/analyze_detail_page.py
 
 # 레거시 1페이지 수동 점검 스크립트
-python scripts/manual_test_crawler.py
+python scripts/dev/manual_test_crawler.py
 
 # 스케줄러용 실행 스크립트
-./scripts/run_crawler.sh
+./scripts/operations/run_crawler.sh
 ```
 
 ## Architecture
@@ -72,12 +77,14 @@ python scripts/manual_test_crawler.py
 
 | Module | Pattern | Responsibility |
 |--------|---------|----------------|
-| `config.py` | class + helper function | 환경변수 로드, 로깅 초기화 |
-| `crawler.py` | class | Selenium 드라이버 생명주기, 목록/상세 페이지 수집 |
-| `parser.py` | functions | HTML에서 공고/회사 정보 추출 |
-| `validators.py` | functions | 저장 전 데이터 검증 및 정제 |
-| `database.py` | class | SQLAlchemy 연결, 테이블 생성, CRUD |
-| `main.py` | functions | Phase 1/2 오케스트레이션, 요약 출력 |
+| `jobkorea/config.py` | class + helper function | 환경변수 로드, 로깅 초기화 |
+| `jobkorea/crawler.py` | class | Selenium 드라이버 생명주기, 목록/상세 페이지 수집 |
+| `jobkorea/parser.py` | functions | HTML에서 공고/회사 정보 추출 |
+| `jobkorea/validators.py` | functions | 저장 전 데이터 검증 및 정제 |
+| `jobkorea/database.py` | class | SQLAlchemy 연결, 테이블 생성, CRUD |
+| `jobkorea/main.py` | functions | Phase 1/2 오케스트레이션, 요약 출력 |
+| `jobkorea/extractors/` | functions | JD 상세 페이지 텍스트 추출 |
+| `jobkorea/analyzers/` | functions | LLM 기반 JD 구조화 분석 |
 
 설계 원칙: 관리할 상태가 있으면 클래스, 없으면 함수.
 
@@ -124,8 +131,9 @@ Code defaults currently use `DB_PORT=5433`.
 
 ## Current Notes
 
-- `scripts/manual_test_crawler.py` is a manual script, not a pytest test module.
-- `scripts/analyze_detail_page.py` is a helper script and is not yet fully aligned with the current Phase 2 flow.
+- `scripts/dev/manual_test_crawler.py` is a manual script, not a pytest test module.
+- `scripts/dev/analyze_detail_page.py` is a helper script for Phase 2 debugging.
 - Phase 1 now tracks `inserted`, `updated`, `unchanged`, `skipped`, and `failed` separately.
-- `main.py` owns operator-facing console output, while internal modules use logging-first behavior.
+- `jobkorea/main.py` owns operator-facing console output, while internal modules use logging-first behavior.
 - DB tests are intentionally skipped when a local PostgreSQL instance is unavailable.
+- 핵심 코드는 `jobkorea/` 패키지 내에 위치하며, `pip install -e .`로 설치합니다.

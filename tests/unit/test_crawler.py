@@ -4,7 +4,7 @@ from pathlib import Path
 
 from selenium.webdriver.common.by import By
 
-from crawler import JobKoreaCrawler
+from jobkorea.crawler import JobKoreaCrawler
 
 
 class FakeDriver:

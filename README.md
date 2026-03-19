@@ -18,44 +18,49 @@
 
 ```text
 jobkorea/
-├── main.py
-├── config.py
-├── crawler.py
-├── parser.py
-├── validators.py
-├── database.py
-├── requirements.txt
+├── jobkorea/              # 핵심 패키지
+│   ├── __init__.py
+│   ├── config.py
+│   ├── crawler.py
+│   ├── parser.py
+│   ├── validators.py
+│   ├── database.py
+│   ├── main.py
+│   ├── extractors/        # JD 텍스트 추출
+│   └── analyzers/         # LLM 분석
+├── apps/
+│   └── dashboard/         # Streamlit 시각화 앱
 ├── scripts/
-│   ├── analyze_detail_page.py
-│   ├── manual_test_crawler.py
-│   ├── phase2_smoke_test.py
-│   └── run_crawler.sh
+│   ├── operations/        # 운영 스크립트
+│   │   ├── run_crawler.sh
+│   │   ├── extract_jd_text.py
+│   │   └── analyze_jd_with_llm.py
+│   └── dev/               # 개발 도구
+│       ├── analyze_detail_page.py
+│       ├── manual_test_crawler.py
+│       └── phase2_smoke_test.py
+├── experiments/           # PoC 실험
 ├── tests/
 │   ├── fixtures/
-│   ├── test_analyze_detail_page.py
 │   ├── conftest.py
-│   ├── test_config.py
-│   ├── test_database.py
-│   ├── test_main.py
-│   ├── test_parser.py
-│   ├── test_phase2_smoke_test.py
-│   └── test_validators.py
-└── docs/
-    ├── archive/
-    ├── status/
-    ├── architecture/
-    ├── guides/
-    ├── plans/
-    └── reports/
+│   ├── unit/              # 단위 테스트
+│   └── integration/       # 통합 테스트
+├── docs/
+├── pyproject.toml
+├── requirements.txt
+├── main.py                # 호환성 wrapper
+└── README.md
 ```
 
-구조 원칙은 단순합니다.
+구조 원칙:
 
-- 루트: 실제 실행 경로와 핵심 모듈
-- `scripts/`: 수동 점검, 보조 분석, 스케줄링 스크립트
-- `tests/`: 자동 테스트
+- `jobkorea/`: 핵심 패키지 (pip install -e . 로 설치)
+- `apps/`: 독립 실행 애플리케이션 (dashboard 등)
+- `scripts/operations/`: 운영 스크립트
+- `scripts/dev/`: 개발/디버깅 도구
+- `experiments/`: PoC 실험 코드
+- `tests/unit/`, `tests/integration/`: 단위/통합 테스트 분리
 - `docs/`: 상태, 설계, runbook, active 계획, 최근 결과
-- `docs/archive/`: 과거 계획/결과/리팩토링 기록
 
 ## 문서 분류 규칙
 
@@ -82,6 +87,10 @@ jobkorea/
 ### 1. 의존성 설치
 
 ```bash
+# 패키지 설치 (editable mode 권장)
+pip install -e .
+
+# 또는 requirements.txt 직접 설치
 pip install -r requirements.txt
 ```
 
@@ -136,13 +145,15 @@ createdb jobkorea
 전체 파이프라인 실행:
 
 ```bash
+python -m jobkorea.main
+# 또는 호환성 wrapper 사용
 python main.py
 ```
 
 Phase 2 소규모 live smoke test:
 
 ```bash
-python scripts/phase2_smoke_test.py --limit 1
+python scripts/dev/phase2_smoke_test.py --limit 1
 ```
 
 이 스크립트는 상세 정보가 비어 있는 회사 중 일부만 골라 실제 `company_page_url` 재사용/회사 페이지 로딩 경로를 검증합니다.
@@ -150,8 +161,8 @@ python scripts/phase2_smoke_test.py --limit 1
 상세 페이지 구조 수동 분석:
 
 ```bash
-python scripts/analyze_detail_page.py --mode jd
-python scripts/analyze_detail_page.py --mode company
+python scripts/dev/analyze_detail_page.py --mode jd
+python scripts/dev/analyze_detail_page.py --mode company
 ```
 
 `--mode jd`는 JD 상세에서 회사 페이지 URL 추출 경로를 점검하고,
@@ -160,13 +171,13 @@ python scripts/analyze_detail_page.py --mode company
 레거시 1페이지 CSV 점검:
 
 ```bash
-python scripts/manual_test_crawler.py
+python scripts/dev/manual_test_crawler.py
 ```
 
 스케줄러용 실행 스크립트:
 
 ```bash
-./scripts/run_crawler.sh
+./scripts/operations/run_crawler.sh
 ```
 
 ## 테스트

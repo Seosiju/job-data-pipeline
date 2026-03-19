@@ -8,7 +8,7 @@ import uuid
 import pytest
 from sqlalchemy import create_engine, text
 
-from database import (
+from jobkorea.database import (
     JOB_STATUS_ACTIVE,
     JOB_STATUS_STALE,
     _calculate_job_posting_changes,
@@ -64,7 +64,7 @@ def is_db_available():
 
 def get_real_db_manager():
     """테스트용 DB Manager 생성 (환경변수 오염 방지)"""
-    from database import DatabaseManager
+    from jobkorea.database import DatabaseManager
     settings = get_real_db_settings()
 
     class TestConfig:

@@ -49,10 +49,10 @@ class TestConfig:
         """환경변수로 설정을 오버라이드할 수 있는지 확인"""
         # mock_env fixture가 환경변수를 설정하고 config 모듈 캐시 정리
         import sys
-        if "config" in sys.modules:
-            del sys.modules["config"]
+        if "jobkorea.config" in sys.modules:
+            del sys.modules["jobkorea.config"]
 
-        from config import Config
+        from jobkorea.config import Config
         config = Config()
 
         assert config.DB_HOST == "testhost"
@@ -77,7 +77,7 @@ class TestConfig:
 
     def test_setup_logging_uses_warning_level_for_console(self, tmp_path):
         """콘솔 로그는 WARNING 이상만 출력"""
-        from config import setup_logging
+        from jobkorea.config import setup_logging
 
         root_logger = logging.getLogger()
         original_handlers = list(root_logger.handlers)

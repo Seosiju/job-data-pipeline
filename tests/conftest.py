@@ -48,8 +48,8 @@ def isolate_env(monkeypatch):
     yield
 
     # config 모듈 캐시 정리 (다음 테스트를 위해)
-    if "config" in sys.modules:
-        del sys.modules["config"]
+    if "jobkorea.config" in sys.modules:
+        del sys.modules["jobkorea.config"]
 
 
 @pytest.fixture
@@ -92,23 +92,26 @@ def mock_env(monkeypatch):
     monkeypatch.setenv("STALE_AFTER_DAYS", "14")
 
     # Config 모듈 reload하여 새 환경변수 적용
-    if "config" in sys.modules:
-        del sys.modules["config"]
+    if "jobkorea.config" in sys.modules:
+        del sys.modules["jobkorea.config"]
 
 
 @pytest.fixture
 def reload_config():
     """Config 모듈을 reload하여 현재 환경변수 반영"""
-    if "config" in sys.modules:
-        del sys.modules["config"]
-    import config
-    return config.Config()
+    # 모든 관련 모듈 캐시 정리
+    modules_to_clear = [k for k in sys.modules if k.startswith("jobkorea")]
+    for mod in modules_to_clear:
+        del sys.modules[mod]
+
+    from jobkorea.config import Config
+    return Config()
 
 
 @pytest.fixture
 def test_db_config():
     """테스트용 DB 설정 (실제 테스트 DB 사용 시)"""
-    from config import Config
+    from jobkorea.config import Config
     config = Config()
     # 테스트 DB 사용 시 여기서 설정 오버라이드
     return config

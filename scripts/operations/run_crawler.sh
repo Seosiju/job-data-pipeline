@@ -14,7 +14,7 @@
 # ===========================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # 프로젝트 루트로 이동
 cd "$PROJECT_ROOT"
@@ -36,7 +36,7 @@ echo "시작 시각: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "=========================================="
 
 # 크롤러 실행
-python main.py
+python -m jobkorea.main
 
 # 실행 결과
 EXIT_CODE=$?

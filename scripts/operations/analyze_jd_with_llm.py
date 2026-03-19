@@ -17,15 +17,17 @@ import sys
 from datetime import datetime
 
 # 프로젝트 루트 경로 추가
-sys.path.insert(0, "/Users/snu.sim/git/jobkorea")
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from dotenv import load_dotenv
-load_dotenv("/Users/snu.sim/git/jobkorea/.env")
+load_dotenv(PROJECT_ROOT / ".env")
 
 from sqlalchemy import text
-from config import Config
-from database import DatabaseManager
-from analyzers.job_analyzer import analyze_job_posting, analyzed_to_dict
+from jobkorea.config import Config
+from jobkorea.database import DatabaseManager
+from jobkorea.analyzers.job_analyzer import analyze_job_posting, analyzed_to_dict
 
 logging.basicConfig(
     level=logging.INFO,

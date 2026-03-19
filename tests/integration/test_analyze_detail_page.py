@@ -1,6 +1,6 @@
 """analyze_detail_page 스크립트 테스트"""
 
-import scripts.analyze_detail_page as analyze_module
+import scripts.dev.analyze_detail_page as analyze_module
 
 
 class FakeScriptCrawler:

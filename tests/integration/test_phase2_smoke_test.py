@@ -1,6 +1,6 @@
 """phase2_smoke_test 스크립트 테스트"""
 
-import scripts.phase2_smoke_test as smoke_module
+import scripts.dev.phase2_smoke_test as smoke_module
 
 
 class FakeSmokeDB:

@@ -19,7 +19,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium_stealth import stealth
 from webdriver_manager.chrome import ChromeDriverManager
 
-from config import Config
+from jobkorea.config import Config
 
 logger = logging.getLogger(__name__)
 

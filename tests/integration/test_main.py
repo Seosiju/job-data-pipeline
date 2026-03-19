@@ -2,7 +2,7 @@
 test_main.py - main 모듈 실행 흐름 테스트
 """
 
-import main as main_module
+import jobkorea.main as main_module
 
 
 class FakeConnection:

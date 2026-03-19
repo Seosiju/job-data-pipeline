@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from bs4 import BeautifulSoup
 
-from parser import (
+from jobkorea.parser import (
     extract_card_data,
     filter_jobs_by_search_preferences,
     parse_company_detail,
@@ -16,7 +16,7 @@ from parser import (
 )
 
 
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
+FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 SEARCH_RESULTS_FIXTURE = FIXTURES_DIR / "jobkorea_search_page_02.html"
 JD_DETAIL_FIXTURE = FIXTURES_DIR / "jobkorea_jd_detail_02.html"
 COMPANY_PAGE_FIXTURE = FIXTURES_DIR / "jobkorea_company_page_02.html"

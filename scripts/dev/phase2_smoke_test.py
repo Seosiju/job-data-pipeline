@@ -19,12 +19,12 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import Config
-from database import DatabaseManager
-from main import run_phase2_for_companies
+from jobkorea.config import Config
+from jobkorea.database import DatabaseManager
+from jobkorea.main import run_phase2_for_companies
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

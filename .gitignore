@@ -20,3 +20,14 @@ htmlcov/
 
 # oh-my-claudecode
 .omc/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/

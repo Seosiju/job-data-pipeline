@@ -3,7 +3,7 @@ test_validators.py - 데이터 검증 로직 테스트
 """
 
 import pytest
-from validators import (
+from jobkorea.validators import (
     validate_job_posting,
     validate_company_details,
     normalize_salary,

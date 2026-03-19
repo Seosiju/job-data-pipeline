@@ -15,13 +15,13 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from sqlalchemy import text
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import Config
-from crawler import JobKoreaCrawler
-from database import get_engine
-from parser import parse_company_detail, parse_company_page_url_from_job_detail
+from jobkorea.config import Config
+from jobkorea.crawler import JobKoreaCrawler
+from jobkorea.database import get_engine
+from jobkorea.parser import parse_company_detail, parse_company_page_url_from_job_detail
 
 
 def get_sample_job_detail_target() -> tuple[str | None, str | None]:
